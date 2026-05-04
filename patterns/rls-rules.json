@@ -1,0 +1,7 @@
+[
+  {"id":"rls-using-true","name":"USING (true) — no restriction","pattern":"USING\\s*\\(\\s*true\\s*\\)","severity":"critical","fix":"Replace USING (true) with USING (auth.uid() = user_id)","breach_precedent":"Lovable CVE-2025-48757: missing RLS exposed 170+ apps."},
+  {"id":"rls-auth-role-only","name":"auth.role() without auth.uid()","pattern":"auth\\.role\\(\\)\\s*=\\s*['\"]authenticated['\"]","severity":"critical","fix":"Replace auth.role()='authenticated' with auth.uid() = user_id","breach_precedent":"Wiz research: found across 20% of vibe-coded apps."},
+  {"id":"rls-uid-is-not-null","name":"auth.uid() IS NOT NULL — logical bypass","pattern":"auth\\.uid\\(\\)\\s+IS\\s+NOT\\s+NULL","severity":"critical","fix":"Replace USING (auth.uid() IS NOT NULL) with USING (auth.uid() = user_id)","breach_precedent":"Wiz: sneakiest RLS bypass — passes naive checks but lets any user see all data."},
+  {"id":"rls-select-star","name":"select('*') without user filter","pattern":"select\\s*\\(\\s*['\"]\\*['\"]\\s*\\)","severity":"warning","fix":"Add .eq('user_id', user.id) to filter by authenticated user.","breach_precedent":"Moltbook: unfiltered select(*) exposed 1.5M tokens."},
+  {"id":"rls-getsession","name":"getSession() on frontend","pattern":"supabase\\.auth\\.getSession\\(\\)","severity":"critical","fix":"Use supabase.auth.getUser() — validates JWT server-side.","breach_precedent":"Cursor research: getSession() reads from localStorage and can be spoofed."}
+]

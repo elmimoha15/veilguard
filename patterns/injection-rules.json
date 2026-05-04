@@ -1,0 +1,68 @@
+[
+  {
+    "id": "sql-template-literal",
+    "name": "SQL Injection via Template Literal",
+    "pattern": "(query|execute|\\$queryRaw|\\$executeRaw)\\s*\\(\\s*`[^`]*\\$\\{",
+    "severity": "critical",
+    "fix": "Use parameterized queries: db.query('SELECT * FROM users WHERE id = ?', [id])",
+    "cwe": "CWE-89",
+    "breach_precedent": "SQL injection is #1 on OWASP Top 10. AI frequently uses string interpolation in queries."
+  },
+  {
+    "id": "sql-string-concat",
+    "name": "SQL Injection via String Concatenation",
+    "pattern": "(query|execute)\\s*\\(\\s*['\"]SELECT.*\\+\\s*(req|params|query|body)",
+    "severity": "critical",
+    "fix": "Use parameterized queries instead of string concatenation.",
+    "cwe": "CWE-89"
+  },
+  {
+    "id": "unsanitized-body-insert",
+    "name": "Unsanitized req.body to Database",
+    "pattern": "\\.(insert|create|update)\\s*\\(\\s*req\\.body",
+    "severity": "critical",
+    "fix": "Validate with Zod/Yup/Joi before passing to database: const validated = schema.parse(req.body)",
+    "cwe": "CWE-20"
+  },
+  {
+    "id": "command-injection-exec",
+    "name": "Command Injection via exec()",
+    "pattern": "(exec|execSync)\\s*\\([^)]*req\\.(body|query|params)",
+    "severity": "critical",
+    "fix": "Never pass user input to exec/eval. Use a whitelist of allowed commands.",
+    "cwe": "CWE-78",
+    "breach_precedent": "CurXecute CVE-2025-54135: command injection via MCP config."
+  },
+  {
+    "id": "command-injection-eval",
+    "name": "Code Injection via eval()",
+    "pattern": "eval\\s*\\([^)]*req\\.(body|query|params)",
+    "severity": "critical",
+    "fix": "Never use eval() with user input. Parse JSON with JSON.parse() instead.",
+    "cwe": "CWE-94"
+  },
+  {
+    "id": "nosql-injection",
+    "name": "NoSQL Injection",
+    "pattern": "\\.(find|findOne|updateOne|deleteOne)\\s*\\(\\s*req\\.body",
+    "severity": "critical",
+    "fix": "Validate and sanitize input before passing to MongoDB queries.",
+    "cwe": "CWE-943"
+  },
+  {
+    "id": "xss-innerhtml",
+    "name": "XSS via innerHTML",
+    "pattern": "innerHTML\\s*=\\s*(req|params|query|body|user)",
+    "severity": "critical",
+    "fix": "Use textContent instead of innerHTML, or sanitize with DOMPurify.",
+    "cwe": "CWE-79"
+  },
+  {
+    "id": "xss-dangerously-set",
+    "name": "XSS via dangerouslySetInnerHTML",
+    "pattern": "dangerouslySetInnerHTML\\s*=\\s*\\{\\{\\s*__html\\s*:",
+    "severity": "warning",
+    "fix": "Avoid dangerouslySetInnerHTML. If necessary, sanitize with DOMPurify first.",
+    "cwe": "CWE-79"
+  }
+]

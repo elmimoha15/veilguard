@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.veilguard/
+*.tgz
+.env
+.env.local
+coverage/

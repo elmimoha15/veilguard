@@ -1,0 +1,5 @@
+[
+  {"id":"firebase-if-true","name":"allow if true — completely open","pattern":"allow\\s+(read|write|read,\\s*write)\\s*:\\s*if\\s+true","severity":"critical","fix":"Replace with: allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;"},
+  {"id":"firebase-client-userid","name":"Client-controlled userId check","pattern":"request\\.(query|data)\\.userId\\s*==\\s*userId","severity":"critical","fix":"Use request.auth.uid == userId instead of request.query.userId."},
+  {"id":"firebase-auth-not-null-only","name":"Any logged-in user reads everything","pattern":"allow\\s+read\\s*:\\s*if\\s+request\\.auth\\s*!=\\s*null\\s*;?\\s*$","severity":"critical","fix":"Add ownership check: allow read: if request.auth != null && request.auth.uid == resource.data.userId;"}
+]

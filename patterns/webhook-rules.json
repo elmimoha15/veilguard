@@ -1,0 +1,39 @@
+[
+  {
+    "provider": "stripe",
+    "endpoint_patterns": ["stripe.*webhook", "webhook.*stripe", "/api/webhook"],
+    "required_verification": ["constructEvent", "stripe-signature"],
+    "severity": "critical",
+    "fix": "Add stripe.webhooks.constructEvent(payload, sig, endpointSecret) before processing the event.",
+    "breach_precedent": "CurXecute-style attacks: unverified webhooks allow arbitrary execution."
+  },
+  {
+    "provider": "paystack",
+    "endpoint_patterns": ["paystack.*webhook", "webhook.*paystack", "/api/paystack"],
+    "required_verification": ["X-Paystack-Signature", "createHmac", "paystack.*signature"],
+    "severity": "critical",
+    "fix": "Validate X-Paystack-Signature header using HMAC SHA512 with your Paystack secret key."
+  },
+  {
+    "provider": "mpesa",
+    "endpoint_patterns": ["mpesa.*callback", "callback.*mpesa", "mpesa.*webhook", "/api/mpesa"],
+    "required_verification": ["request.ip", "safaricom", "callback_token", "validateIp"],
+    "severity": "critical",
+    "fix": "Validate M-Pesa callback source IP against Safaricom's known IP range, or verify the callback token.",
+    "breach_precedent": "Unvalidated M-Pesa callbacks allow spoofed successful payment notifications."
+  },
+  {
+    "provider": "github",
+    "endpoint_patterns": ["github.*webhook", "webhook.*github", "/api/github"],
+    "required_verification": ["X-Hub-Signature", "x-hub-signature-256", "verifySignature", "createHmac"],
+    "severity": "critical",
+    "fix": "Verify the X-Hub-Signature-256 header using HMAC SHA256 with your webhook secret."
+  },
+  {
+    "provider": "flutterwave",
+    "endpoint_patterns": ["flutterwave.*webhook", "webhook.*flutterwave", "rave.*webhook"],
+    "required_verification": ["verif-hash", "FLWSECK", "verifyTransactionHash"],
+    "severity": "critical",
+    "fix": "Validate the verif-hash header against your Flutterwave secret key."
+  }
+]
