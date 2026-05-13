@@ -1,0 +1,23 @@
+# Secrets — never ship
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+
+# Tests and fixtures
+tests/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Local / dev artifacts (belt and suspenders with "files" whitelist)
+src/
+coverage/
+node_modules/
+.veilguard/
+*.tgz
+
+# Intentionally vulnerable sample apps
+veilguard-test*/

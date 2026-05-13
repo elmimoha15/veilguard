@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "veilguard-cli"],
+      "env": {
+        "VEILGUARD_KEY": "VEILGUARD-DEV-MASTER-KEY"
+      }
+    }
+  }
+}
