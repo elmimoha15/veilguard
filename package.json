@@ -4,7 +4,7 @@
   "description": "Silent MCP security scanner for vibe coders",
   "type": "module",
   "bin": {
-    "veilguard": "./dist/cli.js",
+    "veilguard-cli": "./dist/cli.js",
     "veilguard-mcp": "./dist/index.js"
   },
   "main": "./dist/index.js",

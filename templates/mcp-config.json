@@ -2,7 +2,7 @@
   "mcpServers": {
     "veilguard": {
       "command": "npx",
-      "args": ["-y", "@veilguard/cli"],
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
       "env": {
         "VEILGUARD_KEY": ""
       }
