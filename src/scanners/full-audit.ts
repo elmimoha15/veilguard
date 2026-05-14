@@ -73,47 +73,97 @@ export async function runFullAudit(directory: string, tier: Tier): Promise<Audit
   return report;
 }
 
-/** Format the full audit report */
+/**
+ * Plain-English consequence per scanner. The end user is a non-technical "vibe coder",
+ * so we describe what will actually happen to them if the issue is not fixed — never
+ * the scanner name, file path, or any technical jargon.
+ */
+const SCANNER_CONSEQUENCES: Record<string, string> = {
+  check_cors:
+    "Hackers can call your API from any website on the internet and steal your users' data",
+  check_env:
+    'Your secret API keys are exposed and could be stolen from your git history',
+  check_supabase_rls:
+    "Any logged-in user can read, edit or delete every other user's data",
+  scan_webhooks: 'Anyone can fake a payment and get your product for free',
+  scan_secrets:
+    'Your API keys are hardcoded — anyone who sees your code can steal them',
+  scan_injection:
+    'Attackers can manipulate your database or run commands on your server',
+  check_headers:
+    'Your app has no browser protection — users are vulnerable to clickjacking',
+  check_auth_config:
+    'Your authentication setup has gaps that could let attackers hijack accounts',
+  scan_dependencies: 'One of your npm packages has a known security vulnerability',
+  check_supply_chain: 'A suspicious package in your project could be stealing data',
+  check_git: 'Sensitive files or secrets have been committed to your git history',
+  check_firebase:
+    'Your Firebase database is wide open — anyone can read or write all data',
+};
+
+/** Format the full audit report in plain English for non-technical users. */
 export function formatAuditReport(report: AuditReport): string {
   const lines: string[] = [
-    `~~ veilguard ~~ Full Security Audit`,
+    '🛡️ Veilguard Security Audit',
     '',
-    `Grade: ${report.grade} (${report.score}/100)`,
-    '',
-    `Summary:`,
-    `  ${report.summary.critical} critical · ${report.summary.warning} warnings · ${report.summary.info} info · ${report.summary.passed} passed`,
+    `Grade: ${report.grade} (Score: ${report.score}/100)`,
     '',
   ];
 
-  // Group findings by severity
-  const criticals = report.scans.flatMap((s) => s.findings).filter((f) => f.severity === 'critical');
-  const warnings = report.scans.flatMap((s) => s.findings).filter((f) => f.severity === 'warning');
+  // If the grade is A or A+, the app passed — skip findings entirely.
+  if (report.grade === 'A' || report.grade === 'A+') {
+    lines.push('✅ Your app passed the security audit. Safe to deploy.');
+    return lines.join('\n');
+  }
 
-  if (criticals.length > 0) {
-    lines.push('⚠️ CRITICAL — must fix before deploy:');
-    for (const f of criticals) {
-      lines.push(`  • ${f.title}`);
-      lines.push(`    ${f.message}`);
-      if (f.fix) lines.push(`    Fix: ${f.fix}`);
-      if (f.breach_precedent) lines.push(`    Breach: ${f.breach_precedent}`);
-    }
+  // Collect one plain-English consequence per scanner per severity bucket.
+  // A scanner shows up under "critical" if it produced any critical finding;
+  // otherwise under "warnings" if it produced any warning finding.
+  const criticalScanners = new Set<string>();
+  const warningScanners = new Set<string>();
+
+  for (const scan of report.scans) {
+    const hasCritical = scan.findings.some((f) => f.severity === 'critical');
+    const hasWarning = scan.findings.some((f) => f.severity === 'warning');
+    if (hasCritical) criticalScanners.add(scan.scanner);
+    else if (hasWarning) warningScanners.add(scan.scanner);
+  }
+
+  const criticalMessages = [...criticalScanners]
+    .map((s) => SCANNER_CONSEQUENCES[s])
+    .filter((m): m is string => Boolean(m));
+  const warningMessages = [...warningScanners]
+    .map((s) => SCANNER_CONSEQUENCES[s])
+    .filter((m): m is string => Boolean(m));
+
+  if (criticalMessages.length > 0) {
+    const word = criticalMessages.length === 1 ? 'issue' : 'issues';
+    lines.push(
+      `Your app has ${criticalMessages.length} critical ${word}. Do NOT deploy until these are fixed:`,
+    );
+    lines.push('');
+    for (const msg of criticalMessages) lines.push(`🔴 ${msg}`);
     lines.push('');
   }
 
-  if (warnings.length > 0) {
-    lines.push('⚡ WARNINGS — should fix:');
-    for (const f of warnings) {
-      lines.push(`  • ${f.title}`);
-      if (f.fix) lines.push(`    Fix: ${f.fix}`);
-    }
+  if (warningMessages.length > 0) {
+    lines.push(
+      `⚠️ ${warningMessages.length} ${warningMessages.length === 1 ? 'warning' : 'warnings'} (less urgent but should be fixed):`,
+    );
+    for (const msg of warningMessages) lines.push(`🟡 ${msg}`);
     lines.push('');
   }
 
-  // Add the AI-ready fix prompt
-  lines.push('---');
-  lines.push('AI-Ready Fix Prompt (paste this to fix all issues):');
-  lines.push('');
-  lines.push(report.fix_prompt);
+  if (criticalMessages.length === 0 && warningMessages.length === 0) {
+    lines.push('✅ No critical issues or warnings found.');
+    return lines.join('\n');
+  }
+
+  if (criticalMessages.length > 0) {
+    lines.push(`Type "fix all critical issues" and I'll patch everything now.`);
+  } else {
+    lines.push(`Type "fix all warnings" and I'll patch everything now.`);
+  }
 
   return lines.join('\n');
 }

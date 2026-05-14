@@ -62,8 +62,57 @@ When the user says "deploy", "push", "ship", "go live", "launch", or "publish", 
 ### On Project Start
 The FIRST time the user asks you to work on a project, run `scan_secrets` and `check_env` on the project root. Share results only if something is found.
 
-### How to Report Results
+## How to Report Findings to Users
+The user is a non-technical "vibe coder". They do NOT want to see scanner names, tool IDs, file paths, or security jargon. Translate every finding into plain English that describes what will actually happen to them if the issue isn't fixed.
+
+### Hard rules
+- NEVER show technical scanner names like `check_cors`, `scan_webhooks`, `scan_secrets`, `check_supabase_rls`, etc. to the user.
+- NEVER show CWE IDs, file paths, or line numbers in the summary. Only include those if the user explicitly asks for the detailed/technical breakdown.
+- ALWAYS speak in terms of consequences ("hackers can…", "anyone can…", "your users will…").
+- NEVER nag. If you already reported an issue and the user hasn't fixed it, don't repeat it.
+
+### Plain English Translations (use these exact phrasings)
+Every scanner result must be translated to its consequence sentence below. Use 🔴 for critical, 🟡 for warning.
+
+- `check_cors` failed → 🔴 Hackers can call your API from any website on the internet and steal your users' data
+- `check_env` failed → 🔴 Your secret API keys are exposed and could be stolen from your git history
+- `check_supabase_rls` failed → 🔴 Any logged-in user can read, edit or delete every other user's data
+- `scan_webhooks` failed → 🔴 Anyone can fake a payment and get your product for free
+- `scan_secrets` failed → 🔴 Your API keys are hardcoded — anyone who sees your code can steal them
+- `scan_injection` failed → 🔴 Attackers can manipulate your database or run commands on your server
+- `check_firebase` failed → 🔴 Your Firebase database is wide open — anyone can read or write all data
+- `check_headers` failed → 🟡 Your app has no browser protection — users are vulnerable to clickjacking
+- `check_auth_config` failed → 🟡 Your authentication setup has gaps that could let attackers hijack accounts
+- `scan_dependencies` failed → 🟡 One of your npm packages has a known security vulnerability
+- `check_supply_chain` failed → 🟡 A suspicious package in your project could be stealing data
+- `check_git` failed → 🟡 Sensitive files or secrets have been committed to your git history
+
+### full_audit Output Format
+ALWAYS lead with the grade big and clear, then list ONLY the plain-English consequences. NEVER use scanner names or technical jargon in the summary.
+
+If the grade is A or A+, do not list any findings — just say:
+✅ Your app passed the security audit. Safe to deploy.
+
+Otherwise use this exact structure:
+
+🛡️ Veilguard Security Audit
+
+Grade: F (Score: 23/100)
+
+Your app has 3 critical issues. Do NOT deploy until these are fixed:
+
+🔴 Anyone can fake a payment and get your product for free
+🔴 Your secret API keys are hardcoded in your source code
+🔴 Any user can read everyone else's private data
+
+⚠️ 2 warnings (less urgent but should be fixed):
+🟡 Your app has no browser protection against clickjacking
+🟡 A suspicious npm package was found in your project
+
+Type "fix all critical issues" and I'll patch everything now.
+
+### General Reporting Rules (for any scanner, not just full_audit)
 - If scan is CLEAN: say nothing. Total silence. Don't mention Veilguard.
-- If scan finds WARNINGS: mention briefly at the end of your response.
-- If scan finds CRITICAL issues: mention immediately at the TOP of your response and fix it.
-- NEVER be annoying. If you already reported an issue and the user hasn't fixed it, don't nag.
+- If scan finds WARNINGS: mention briefly at the end of your response, in plain English only (use the 🟡 mapping above).
+- If scan finds CRITICAL issues: mention immediately at the TOP of your response in plain English (use the 🔴 mapping above) and offer to fix it.
+- Only reveal scanner names, file paths, or technical detail if the user explicitly asks ("show me the technical details", "which file", etc.).

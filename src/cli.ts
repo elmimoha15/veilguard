@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
+import { homedir } from 'os';
 import { getTemplatesDir } from './utils/paths.js';
 import { scanSecrets } from './scanners/secret-scanner.js';
 import { checkEnv } from './scanners/env-checker.js';
@@ -18,7 +19,7 @@ function detectIDEs(dir: string): string[] {
   const ides: string[] = [];
   if (existsSync(join(dir, '.cursor'))) ides.push('cursor');
   if (existsSync(join(dir, '.vscode'))) ides.push('vscode');
-  if (existsSync(join(dir, '.windsurf'))) ides.push('windsurf');
+  if (existsSync(join(dir, '.windsurf')) || existsSync(join(homedir(), '.windsurf'))) ides.push('windsurf');
   if (existsSync(join(dir, '.claude')) || existsSync(join(dir, 'CLAUDE.md'))) ides.push('claude');
   if (existsSync(join(dir, '.idea'))) ides.push('jetbrains');
   if (existsSync(join(dir, '.gemini'))) ides.push('antigravity');
@@ -95,27 +96,36 @@ function init(): void {
       case 'cursor':
         copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
         addMcpConfig(join(dir, '.cursor', 'mcp.json'));
-        process.stdout.write('  ✓ Cursor: .cursorrules + .cursor/mcp.json\n');
+        process.stdout.write('  ✓ Cursor detected\n');
+        process.stdout.write('    Created: .cursorrules\n');
+        process.stdout.write('    Created: .cursor/mcp.json\n');
         break;
       case 'vscode':
+        copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
         addMcpConfig(join(dir, '.vscode', 'mcp.json'));
-        process.stdout.write('  ✓ VS Code: .vscode/mcp.json\n');
+        process.stdout.write('  ✓ VS Code detected\n');
+        process.stdout.write('    Created: .cursorrules\n');
+        process.stdout.write('    Created: .vscode/mcp.json\n');
         break;
       case 'windsurf':
         copyTemplate('windsurfrules.txt', join(dir, '.windsurfrules'), true);
         addMcpConfig(join(dir, '.windsurf', 'mcp.json'));
-        process.stdout.write('  ✓ Windsurf: .windsurfrules + .windsurf/mcp.json\n');
+        process.stdout.write('  ✓ Windsurf detected\n');
+        process.stdout.write('    Created: .windsurfrules\n');
+        process.stdout.write('    Created: .windsurf/mcp.json\n');
         break;
-      case 'claude':
+      case 'claude': {
         copyTemplate('claude-md.txt', join(dir, 'CLAUDE.md'), true);
         addMcpConfig(join(dir, '.claude', 'mcp.json'));
-        if (existsSync(join(dir, '.claude'))) {
-          copyTemplate('claude-hooks.json', join(dir, '.claude', 'hooks.json'));
-          process.stdout.write('  ✓ Claude Code: CLAUDE.md + .claude/mcp.json + hooks\n');
-        } else {
-          process.stdout.write('  ✓ Claude Code: CLAUDE.md + .claude/mcp.json\n');
-        }
+        const claudeDir = join(dir, '.claude');
+        if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
+        copyTemplate('claude-hooks.json', join(claudeDir, 'hooks.json'));
+        process.stdout.write('  ✓ Claude Code detected\n');
+        process.stdout.write('    Created: CLAUDE.md\n');
+        process.stdout.write('    Created: .claude/mcp.json\n');
+        process.stdout.write('    Created: .claude/hooks.json\n');
         break;
+      }
       case 'jetbrains':
         process.stdout.write('  ✓ JetBrains: Add manually in Settings → Tools → MCP Server\n');
         process.stdout.write('    Command: npx  Args: -y @veilguard/cli\n');
@@ -123,11 +133,29 @@ function init(): void {
       case 'antigravity':
         copyTemplate('antigravityrules.txt', join(dir, '.antigravityrules'), true);
         addMcpConfig(join(dir, '.gemini', 'mcp.json'));
-        process.stdout.write('  ✓ Antigravity: .antigravityrules + .gemini/mcp.json\n');
+        process.stdout.write('  ✓ Antigravity detected\n');
+        process.stdout.write('    Created: .antigravityrules\n');
+        process.stdout.write('    Created: .gemini/mcp.json\n');
         break;
-      default:
-        process.stdout.write('  ✓ MCP config ready. Add to your IDE manually.\n');
+      default: {
+        // No IDE detected — drop every rules file so the user is covered
+        // regardless of which assistant they end up using.
+        copyTemplate('windsurfrules.txt', join(dir, '.windsurfrules'), true);
+        copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
+        copyTemplate('claude-md.txt', join(dir, 'CLAUDE.md'), true);
+        copyTemplate('antigravityrules.txt', join(dir, '.antigravityrules'), true);
+        const claudeDir = join(dir, '.claude');
+        if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
+        copyTemplate('claude-hooks.json', join(claudeDir, 'hooks.json'));
+        process.stdout.write('  ✓ No IDE detected — installed rules for every supported assistant\n');
+        process.stdout.write('    Created: .windsurfrules\n');
+        process.stdout.write('    Created: .cursorrules\n');
+        process.stdout.write('    Created: CLAUDE.md\n');
+        process.stdout.write('    Created: .antigravityrules\n');
+        process.stdout.write('    Created: .claude/hooks.json\n');
+        process.stdout.write('    MCP config: add to your IDE manually using templates/mcp-config.json\n');
         break;
+      }
     }
   }
 
