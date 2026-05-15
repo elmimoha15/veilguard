@@ -14,24 +14,9 @@ function getCommand(): string {
   return process.argv[2] || 'start';
 }
 
-/** Detect which IDEs are present in the current directory */
-function detectIDEs(dir: string): string[] {
-  const ides: string[] = [];
-
-  // Project-level checks — most specific, checked first
-  if (existsSync(join(dir, '.cursor'))) ides.push('cursor');
-  if (existsSync(join(dir, '.vscode'))) ides.push('vscode');
-  if (existsSync(join(dir, '.windsurf'))) ides.push('windsurf');
-  if (existsSync(join(dir, '.claude')) || existsSync(join(dir, 'CLAUDE.md'))) ides.push('claude');
-  if (existsSync(join(dir, '.gemini'))) ides.push('antigravity');
-
-  // Global Windsurf install (~/.windsurf) — only used as a fallback so it
-  // doesn't fire when the user is working in Cursor / VS Code / etc.
-  if (ides.length === 0 && existsSync(join(homedir(), '.windsurf'))) {
-    ides.push('windsurf');
-  }
-
-  return ides;
+/** Read the MCP config template */
+function getMcpConfig(): Record<string, unknown> {
+  return JSON.parse(readFileSync(join(templatesDir, 'mcp-config.json'), 'utf-8'));
 }
 
 /** Copy a template file to the project */
@@ -90,85 +75,79 @@ function updateGitignore(dir: string): void {
 /** Initialize Veilguard for the current project */
 function init(): void {
   const dir = process.cwd();
-  const ides = detectIDEs(dir);
+  const mcpConfig = getMcpConfig();
+  const mcpJson = JSON.stringify(mcpConfig, null, 2);
 
   process.stdout.write('\n  🛡️  Veilguard — Silent security for vibe coders\n\n');
 
-  if (ides.length === 0) {
-    process.stdout.write('  No IDE config detected. Setting up with universal MCP config.\n');
-    ides.push('universal');
-  }
+  // ── 1. Rules files (all IDEs — they don't conflict) ────────────────
+  copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
+  copyTemplate('windsurfrules.txt', join(dir, '.windsurfrules'), true);
+  copyTemplate('claude-md.txt', join(dir, 'CLAUDE.md'), true);
+  copyTemplate('antigravityrules.txt', join(dir, '.antigravityrules'), true);
 
-  for (const ide of ides) {
-    switch (ide) {
-      case 'cursor':
-        copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
-        addMcpConfig(join(dir, '.cursor', 'mcp.json'));
-        process.stdout.write('  ✓ Cursor detected\n');
-        process.stdout.write('    Created: .cursorrules\n');
-        process.stdout.write('    Created: .cursor/mcp.json\n');
-        break;
-      case 'vscode':
-        copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
-        addMcpConfig(join(dir, '.vscode', 'mcp.json'));
-        process.stdout.write('  ✓ VS Code detected\n');
-        process.stdout.write('    Created: .cursorrules\n');
-        process.stdout.write('    Created: .vscode/mcp.json\n');
-        break;
-      case 'windsurf':
-        copyTemplate('windsurfrules.txt', join(dir, '.windsurfrules'), true);
-        addMcpConfig(join(dir, '.windsurf', 'mcp.json'));
-        process.stdout.write('  ✓ Windsurf detected\n');
-        process.stdout.write('    Created: .windsurfrules\n');
-        process.stdout.write('    Created: .windsurf/mcp.json\n');
-        break;
-      case 'claude': {
-        copyTemplate('claude-md.txt', join(dir, 'CLAUDE.md'), true);
-        addMcpConfig(join(dir, '.claude', 'mcp.json'));
-        const claudeDir = join(dir, '.claude');
-        if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
-        copyTemplate('claude-hooks.json', join(claudeDir, 'hooks.json'));
-        process.stdout.write('  ✓ Claude Code detected\n');
-        process.stdout.write('    Created: CLAUDE.md\n');
-        process.stdout.write('    Created: .claude/mcp.json\n');
-        process.stdout.write('    Created: .claude/hooks.json\n');
-        break;
+  const claudeDir = join(dir, '.claude');
+  if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
+  copyTemplate('claude-hooks.json', join(claudeDir, 'hooks.json'));
+
+  process.stdout.write('  ✓ Security rules installed\n');
+  process.stdout.write('    .cursorrules          (Cursor + VS Code)\n');
+  process.stdout.write('    .windsurfrules        (Windsurf)\n');
+  process.stdout.write('    CLAUDE.md             (Claude Code)\n');
+  process.stdout.write('    .antigravityrules     (Antigravity)\n');
+  process.stdout.write('    .claude/hooks.json    (Claude Code post-save hooks)\n');
+
+  // ── 2. Project-level MCP configs ───────────────────────────────────
+  addMcpConfig(join(dir, '.cursor', 'mcp.json'));
+  addMcpConfig(join(dir, '.vscode', 'mcp.json'));
+  addMcpConfig(join(dir, '.claude', 'mcp.json'));
+  addMcpConfig(join(dir, '.gemini', 'mcp.json'));
+
+  process.stdout.write('\n  ✓ MCP config added for:\n');
+  process.stdout.write('    .cursor/mcp.json      (Cursor)\n');
+  process.stdout.write('    .vscode/mcp.json      (VS Code)\n');
+  process.stdout.write('    .claude/mcp.json      (Claude Code)\n');
+  process.stdout.write('    .gemini/mcp.json      (Antigravity)\n');
+
+  // ── 3. Windsurf uses a global config — print instructions ──────────
+  const windsurfGlobal = join(homedir(), '.windsurf', 'mcp.json');
+  if (existsSync(windsurfGlobal)) {
+    // Try to add to existing config
+    try {
+      const existing = JSON.parse(readFileSync(windsurfGlobal, 'utf-8'));
+      if (!existing.mcpServers?.veilguard) {
+        existing.mcpServers = { ...existing.mcpServers, ...(mcpConfig as Record<string, unknown>).mcpServers as Record<string, unknown> };
+        writeFileSync(windsurfGlobal, JSON.stringify(existing, null, 2));
+        process.stdout.write('    ~/.windsurf/mcp.json  (Windsurf — updated)\n');
+      } else {
+        process.stdout.write('    ~/.windsurf/mcp.json  (Windsurf — already configured)\n');
       }
-      case 'antigravity':
-        copyTemplate('antigravityrules.txt', join(dir, '.antigravityrules'), true);
-        addMcpConfig(join(dir, '.gemini', 'mcp.json'));
-        process.stdout.write('  ✓ Antigravity detected\n');
-        process.stdout.write('    Created: .antigravityrules\n');
-        process.stdout.write('    Created: .gemini/mcp.json\n');
-        break;
-      default: {
-        // No IDE detected — drop every rules file so the user is covered
-        // regardless of which assistant they end up using.
-        copyTemplate('windsurfrules.txt', join(dir, '.windsurfrules'), true);
-        copyTemplate('cursorrules.txt', join(dir, '.cursorrules'), true);
-        copyTemplate('claude-md.txt', join(dir, 'CLAUDE.md'), true);
-        copyTemplate('antigravityrules.txt', join(dir, '.antigravityrules'), true);
-        const claudeDir = join(dir, '.claude');
-        if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
-        copyTemplate('claude-hooks.json', join(claudeDir, 'hooks.json'));
-        process.stdout.write('  ✓ No IDE detected — installed rules for every supported assistant\n');
-        process.stdout.write('    Created: .windsurfrules\n');
-        process.stdout.write('    Created: .cursorrules\n');
-        process.stdout.write('    Created: CLAUDE.md\n');
-        process.stdout.write('    Created: .antigravityrules\n');
-        process.stdout.write('    Created: .claude/hooks.json\n');
-        process.stdout.write('    MCP config: add to your IDE manually using templates/mcp-config.json\n');
-        break;
-      }
+    } catch {
+      process.stdout.write(`\n  ⚠ Windsurf: could not update ~/.windsurf/mcp.json\n`);
+      process.stdout.write(`    Add this to ~/.windsurf/mcp.json manually:\n\n`);
+      process.stdout.write(`    ${mcpJson.replace(/\n/g, '\n    ')}\n`);
     }
+  } else if (existsSync(join(homedir(), '.windsurf'))) {
+    // ~/.windsurf exists but no mcp.json yet
+    try {
+      writeFileSync(windsurfGlobal, mcpJson);
+      process.stdout.write('    ~/.windsurf/mcp.json  (Windsurf — created)\n');
+    } catch {
+      process.stdout.write(`\n  ⚠ Windsurf: add this to ~/.windsurf/mcp.json:\n\n`);
+      process.stdout.write(`    ${mcpJson.replace(/\n/g, '\n    ')}\n`);
+    }
+  } else {
+    process.stdout.write('\n  ℹ Windsurf users: add the MCP config to ~/.windsurf/mcp.json\n');
+    process.stdout.write('    See: https://veilguard.dev/docs/installation/windsurf\n');
   }
 
+  // ── 4. Gitignore ──────────────────────────────────────────────────
   updateGitignore(dir);
 
-  process.stdout.write('\n  Veilguard is now protecting this project.\n');
-  process.stdout.write('  Free users: all 13 scanners active (depth-limited).\n');
-  process.stdout.write('  Pro users: add VEILGUARD_KEY to your MCP config.\n');
-  process.stdout.write('  → veilguard.dev/pro\n\n');
+  // ── 5. Done ────────────────────────────────────────────────────────
+  process.stdout.write('\n  ✅ Veilguard is ready. Restart your IDE to activate.\n');
+  process.stdout.write('  Free: all 13 scanners active.\n');
+  process.stdout.write('  Pro: add VEILGUARD_KEY to your MCP config → veilguard.dev/pro\n\n');
 }
 
 /** Quick scan for Claude Code hooks (fast, single file or directory) */

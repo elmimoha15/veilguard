@@ -24,9 +24,9 @@ npx veilguard-cli init
 
 That's it. The init command:
 
-1. **Detects your IDE** — checks for `.cursor/`, `.windsurf/`, `.vscode/`, `.claude/`, `.gemini/`, or `CLAUDE.md`
-2. **Writes the MCP config** — puts the right JSON file where your IDE expects it
-3. **Copies the security rules file** — `.cursorrules`, `.windsurfrules`, `CLAUDE.md`, or `.antigravityrules` depending on your IDE
+1. **Installs rules files** for every supported IDE (Cursor, Windsurf, VS Code, Claude Code, Antigravity)
+2. **Writes the MCP config** for every supported IDE — each gets its own config file
+3. **Updates `~/.windsurf/mcp.json`** if Windsurf is installed (global config)
 4. **Updates your `.gitignore`** — adds `.veilguard/` so scan caches don't get committed
 
 Then **restart your IDE** and Veilguard is active.
@@ -35,57 +35,29 @@ Then **restart your IDE** and Veilguard is active.
 
 ## What you'll see in the terminal
 
-**Windsurf detected:**
 ```
   🛡️  Veilguard — Silent security for vibe coders
 
-  ✓ Windsurf detected
-    Created: .windsurfrules
-    Created: .windsurf/mcp.json
+  ✓ Security rules installed
+    .cursorrules          (Cursor + VS Code)
+    .windsurfrules        (Windsurf)
+    CLAUDE.md             (Claude Code)
+    .antigravityrules     (Antigravity)
+    .claude/hooks.json    (Claude Code post-save hooks)
 
-  Veilguard is now protecting this project.
-  Free users: all 13 scanners active (depth-limited).
-  Pro users: add VEILGUARD_KEY to your MCP config.
-  → veilguard.dev/pro
+  ✓ MCP config added for:
+    .cursor/mcp.json      (Cursor)
+    .vscode/mcp.json      (VS Code)
+    .claude/mcp.json      (Claude Code)
+    .gemini/mcp.json      (Antigravity)
+    ~/.windsurf/mcp.json  (Windsurf — updated)
+
+  ✅ Veilguard is ready. Restart your IDE to activate.
+  Free: all 13 scanners active.
+  Pro: add VEILGUARD_KEY to your MCP config → veilguard.dev/pro
 ```
 
-**Cursor detected:**
-```
-  🛡️  Veilguard — Silent security for vibe coders
-
-  ✓ Cursor detected
-    Created: .cursorrules
-    Created: .cursor/mcp.json
-
-  Veilguard is now protecting this project.
-```
-
-**Claude Code detected:**
-```
-  🛡️  Veilguard — Silent security for vibe coders
-
-  ✓ Claude Code detected
-    Created: CLAUDE.md
-    Created: .claude/mcp.json
-    Created: .claude/hooks.json
-
-  Veilguard is now protecting this project.
-```
-
-**No IDE detected** (installs rules for all assistants):
-```
-  🛡️  Veilguard — Silent security for vibe coders
-
-  ✓ No IDE detected — installed rules for every supported assistant
-    Created: .windsurfrules
-    Created: .cursorrules
-    Created: CLAUDE.md
-    Created: .antigravityrules
-    Created: .claude/hooks.json
-    MCP config: add to your IDE manually using templates/mcp-config.json
-
-  Veilguard is now protecting this project.
-```
+One command sets up **every IDE at once**. The rules files and MCP configs don't conflict — each IDE only reads its own.
 
 ---
 
