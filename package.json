@@ -1,6 +1,6 @@
 {
   "name": "veilguard-cli",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Silent MCP security scanner for vibe coders",
   "type": "module",
   "bin": {
