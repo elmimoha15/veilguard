@@ -1,0 +1,131 @@
+# Auto-Scanning
+
+Veilguard scans automatically. You never type a command. You never open a dashboard.
+
+---
+
+## How it works
+
+When you run `npx veilguard-cli init`, Veilguard writes a **security rules file** into your project. This file tells your AI agent exactly which Veilguard tool to call, and when.
+
+| IDE | Rules file |
+|-----|-----------|
+| Windsurf | `.windsurfrules` |
+| Cursor | `.cursorrules` |
+| VS Code | `.cursorrules` |
+| Claude Code | `CLAUDE.md` |
+| Antigravity | `.antigravityrules` |
+
+Your AI agent reads these rules on every prompt and follows them automatically.
+
+---
+
+## Trigger table
+
+| When this happens | Veilguard calls |
+|-------------------|----------------|
+| You create or modify any `.ts`, `.tsx`, `.js`, `.jsx`, `.sql`, `.json`, `.env`, or config file | `scan_secrets` |
+| You create or modify an API route, endpoint, webhook handler, or server action | `scan_webhooks` + `scan_injection` |
+| You create or modify a Supabase migration, SQL file, or RLS policy | `check_supabase_rls` |
+| You create or modify Firebase rules | `check_firebase` |
+| You modify `package.json` or add a new dependency | `check_supply_chain` + `scan_dependencies` |
+| You modify `.env`, `.gitignore`, `next.config.js`, or any config file | `check_env` |
+| You say "deploy", "push to prod", "go live", "ship it", "launch", or "publish" | `full_audit` (Pro) or all free scanners in sequence |
+| The first time you work on a new project | `scan_secrets` + `check_env` |
+| You ask anything like "is my app secure?", "audit my code", "what's my security grade?" | `full_audit` |
+
+---
+
+## The silent scan rule
+
+**If a scan is clean: total silence.** Your AI says nothing. You won't even know a scan ran.
+
+**If something is found:** your AI mentions it in plain English at the right moment — critical issues at the top of the response, warnings at the bottom. No jargon, no scanner names, no file paths in the summary (unless you ask for them).
+
+### Example: AI catches a hardcoded key
+
+You write a file with `const STRIPE_KEY = "sk_live_..."`. Your AI agent:
+
+1. Calls `scan_secrets` silently (you don't see this step)
+2. Returns a finding
+3. Reports it as: *"🔴 Your Stripe live key is hardcoded in source code — anyone who sees your repo can steal it and charge your customers."*
+4. Offers to fix it
+
+### Example: Clean scan
+
+You write a new API route. Your AI agent:
+
+1. Calls `scan_webhooks` and `scan_injection` silently
+2. Both return clean
+3. Says nothing about security — proceeds with your request as normal
+
+---
+
+## Claude Code: post-save hooks
+
+Claude Code gets an extra layer of protection beyond what the AI agent decides to do.
+
+A `hooks.json` file is written to `.claude/hooks.json` that triggers Veilguard on **every file save** — not just AI writes, but your own manual edits too:
+
+```json
+{
+  "hooks": {
+    "postSave": [
+      {
+        "pattern": "**/*.{ts,tsx,js,jsx,json,sql,env,toml,yaml,yml}",
+        "command": "npx veilguard-cli quick-scan --file $FILE",
+        "description": "Veilguard: scan saved file for security issues"
+      }
+    ],
+    "preDeploy": [
+      {
+        "command": "npx veilguard-cli quick-scan --dir .",
+        "description": "Veilguard: pre-deploy security check"
+      }
+    ]
+  }
+}
+```
+
+This means:
+- **postSave:** every time you save a `.ts`, `.tsx`, `.js`, `.jsx`, `.json`, `.sql`, `.env`, `.toml`, `.yaml`, or `.yml` file, a quick scan runs against it
+- **preDeploy:** a full directory scan runs before any deploy
+
+Both hooks are silent — output only appears if a finding is returned.
+
+---
+
+## Security / audit keyword triggers
+
+When you use any phrase that implies you want a full security assessment, your AI agent **must** call `full_audit` instead of improvising its own checklist. This is enforced by the rules file.
+
+Phrases that trigger a full audit (and semantic equivalents):
+
+- "full audit" / "security audit" / "audit my app"
+- "is my app secure?" / "is my app safe?"
+- "what's my security grade?" / "grade my app"
+- "ready to deploy?" / "can I deploy?" / "safe to launch?"
+- "scan everything" / "scan my whole project"
+- "check my security"
+
+The AI calls `full_audit` silently and returns the report in plain English. It never substitutes its own opinion for a real scan.
+
+---
+
+## Reporting format
+
+When a finding is returned, your AI translates it into a plain-English consequence — never a scanner name or CWE number:
+
+| Finding type | What your AI says |
+|-------------|-------------------|
+| Hardcoded secret | 🔴 Your API keys are hardcoded — anyone who sees your code can steal them |
+| Missing webhook verification | 🔴 Anyone can fake a payment and get your product for free |
+| CORS wildcard | 🔴 Hackers can call your API from any website and steal your users' data |
+| Missing Supabase RLS | 🔴 Any logged-in user can read, edit or delete every other user's data |
+| SQL injection | 🔴 Attackers can manipulate your database or run commands on your server |
+| Missing security headers | 🟡 Your app has no browser protection — users are vulnerable to clickjacking |
+| Dependency CVE | 🟡 One of your npm packages has a known security vulnerability |
+| Sensitive logging | 🟡 You're logging passwords or tokens — anyone with log access can read them |
+
+🔴 = critical (mentioned immediately, at the top of the response)  
+🟡 = warning (mentioned briefly at the end)

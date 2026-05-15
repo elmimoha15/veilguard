@@ -1,0 +1,112 @@
+# Install on Antigravity
+
+---
+
+## Automatic setup (recommended)
+
+Open your terminal, `cd` into your project root, and run:
+
+```bash
+npx veilguard-cli init
+```
+
+Veilguard detects the `.gemini/` folder and:
+- Writes the MCP config to `.gemini/mcp.json`
+- Writes `.antigravityrules` into your project root
+
+Then **restart Antigravity**.
+
+---
+
+## Manual setup
+
+### Step 1 — Add the MCP config
+
+Create `.gemini/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": ""
+      }
+    }
+  }
+}
+```
+
+Or use the Antigravity **MCP Settings Panel** to add the server:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `veilguard` |
+| **Command** | `npx -y --package=veilguard-cli veilguard-mcp` |
+| **Environment** | `VEILGUARD_KEY=` (empty for free) |
+
+### Step 2 — Add the security rules file
+
+Create `.antigravityrules` in your project root. This file tells Antigravity's AI when to run security scans.
+
+Generate it:
+```bash
+npx veilguard-cli init
+```
+
+Or copy the template from the [veilguard repository](https://github.com/elmimoha15/veilguard/blob/main/templates/antigravityrules.txt).
+
+### Step 3 — Restart Antigravity
+
+Close and reopen Antigravity. The MCP server starts on the next launch.
+
+---
+
+## Verify the installation
+
+After restarting, ask the AI: *"What Veilguard tools do you have access to?"* — it should list all 14 tools.
+
+---
+
+## Add your Pro key
+
+Open `.gemini/mcp.json` and add your license key:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Restart Antigravity after saving.
+
+---
+
+## How auto-scanning works in Antigravity
+
+The `.antigravityrules` file instructs the AI agent to call Veilguard tools at specific moments:
+
+- After you write or modify any file → `scan_secrets`
+- After you create an API route → `scan_webhooks` + `scan_injection`
+- After you change a Supabase migration or SQL file → `check_supabase_rls`
+- After you modify `package.json` → `check_supply_chain` + `scan_dependencies`
+- When you say "deploy", "go live", "ship it" → `full_audit`
+
+Clean scans produce no output. The agent stays silent unless something is found.
+
+---
+
+## Notes
+
+- `.gemini/mcp.json` is project-level — run `init` in each project you want protected
+- `.antigravityrules` is also project-level
+- Node.js 18 or later is required

@@ -1,0 +1,192 @@
+# Full Audit
+
+The `full_audit` tool runs all 13 scanners at once, calculates a security score, assigns a letter grade (A+ to F), and generates an AI-ready fix prompt you can paste into your agent to fix everything at once.
+
+**Requires:** Pro license (`VEILGUARD_KEY` set in your MCP config)  
+**Limit:** 3 full audits per month (resets on the 1st of each month)
+
+---
+
+## What it scans
+
+`full_audit` runs every Veilguard scanner in one pass:
+
+1. `scan_secrets` — hardcoded API keys
+2. `check_env` — environment variable exposure
+3. `check_git` — git history and gitignore gaps
+4. `check_auth_config` — authentication misconfigurations
+5. `scan_webhooks` — unsigned webhook handlers
+6. `scan_injection` — SQL/NoSQL/command injection, IDOR, mass assignment
+7. `check_cors` — CORS misconfiguration
+8. `check_supply_chain` — malicious packages
+9. `scan_dependencies` — known CVEs
+10. `check_supabase_rls` — Row Level Security policies
+11. `check_firebase` — Firebase security rules
+12. `scan_app_security` — rate limiting, password storage, file uploads, error exposure, sensitive logging, open redirects
+
+---
+
+## Scoring system
+
+The audit starts at **100 points** and deducts points per finding based on real-world impact:
+
+| Finding type | Points deducted |
+|-------------|----------------|
+| Hardcoded secret | −20 per finding |
+| Unsigned webhook | −20 per finding |
+| SQL/NoSQL/command injection | −20 per finding |
+| Missing Supabase RLS / open Firebase rules | −20 per finding |
+| IDOR (Insecure Direct Object Reference) | −20 per finding |
+| Mass assignment | −15 per finding |
+| Missing rate limiting on auth/payment routes | −15 per finding |
+| CORS wildcard | −10 per finding |
+| Sensitive data in logs | −10 per finding |
+| Stack trace / error object exposed to client | −8 per finding |
+| Missing security headers | −5 per finding |
+| All other criticals (fallback) | −15 per finding |
+| All other warnings (fallback) | −5 per finding |
+| Info findings | −1 per finding |
+
+Score floor is **0**. Maximum is **100**.
+
+---
+
+## Grade table
+
+| Grade | Score | Plain English meaning |
+|-------|-------|-----------------------|
+| **A+** | 95–100 | Your app is production-ready. Excellent security hygiene. |
+| **A** | 90–94 | Your app is production-ready. Excellent security hygiene. |
+| **B+** | 85–89 | Good security. A few improvements recommended before scaling. |
+| **B** | 80–84 | Good security. A few improvements recommended before scaling. |
+| **C+** | 75–79 | Moderate risk. Fix warnings before you get real users. |
+| **C** | 70–74 | Moderate risk. Fix warnings before you get real users. |
+| **D** | 60–69 | High risk. Critical issues present. Fix before deploying. |
+| **F** | 0–59 | Do NOT deploy. Your app has critical vulnerabilities that attackers actively exploit. |
+
+---
+
+## Report format (Pro)
+
+A full audit report has five sections:
+
+### 1. Header
+```
+🛡️ Veilguard Security Audit
+─────────────────────────────
+Grade: B+  |  Score: 87/100  |  Found: 2 issues
+```
+
+### 2. Critical findings (if any)
+```
+─────────────────────────────
+🔴 CRITICAL — Fix before deploying (1 issue)
+─────────────────────────────
+1. Anyone can fake a payment and get your product for free
+   → File: src/app/api/webhooks/stripe/route.ts:14
+   → Fix: Wrap your handler with Stripe's constructEvent() to verify
+          the webhook signature before processing any event.
+```
+
+### 3. Warnings (if any)
+```
+─────────────────────────────
+🟡 WARNINGS — Fix soon (1 issue)
+─────────────────────────────
+2. Your app has no browser protection — users are vulnerable to clickjacking
+   → Fix: Add Content-Security-Policy and X-Frame-Options headers in
+          next.config.js or middleware.ts
+```
+
+### 4. Grade meaning
+```
+─────────────────────────────
+📊 What this grade means
+─────────────────────────────
+Good security. A few improvements recommended before scaling.
+```
+
+### 5. AI Fix Prompt
+```
+─────────────────────────────
+🔧 AI Fix Prompt
+─────────────────────────────
+Copy and paste this into your AI agent to fix everything at once:
+
+Fix the following security issues in my project:
+
+1. [CRITICAL] Webhook handler missing signature verification
+   File: src/app/api/webhooks/stripe/route.ts:14
+   Fix: Wrap your handler with Stripe's constructEvent()...
+
+Apply all fixes while maintaining existing functionality.
+```
+
+### 6. What passed
+```
+─────────────────────────────
+✅ What passed (11 checks)
+─────────────────────────────
+• No hardcoded API keys or secrets found in your source code
+• Environment variables are properly configured
+• Git history is clean
+• Authentication setup looks solid
+• No SQL injection or unsafe input found
+• CORS is configured safely
+• No malicious or typosquatted packages detected
+• No dependency vulnerabilities found
+• Supabase Row Level Security policies look safe
+• Firebase security rules look safe
+• App-layer checks passed (rate limiting, IDOR, uploads, logging, etc.)
+```
+
+---
+
+## Free tier output
+
+Free users can call `full_audit` and see all findings — including file locations and fix suggestions — but the **letter grade is locked**:
+
+```
+🛡️ Veilguard Security Audit
+─────────────────────────────
+Found: 1 issue
+
+─────────────────────────────
+🔴 CRITICAL — Fix before deploying (1 issue)
+─────────────────────────────
+1. Anyone can fake a payment and get your product for free
+   → File: src/app/api/webhooks/stripe/route.ts:14
+   → Fix: Wrap your handler with Stripe's constructEvent()...
+
+─────────────────────────────
+🔒 Your security grade is locked
+─────────────────────────────
+Veilguard scanned your project and found the issues above.
+To unlock your grade (A+ to F), detailed fix instructions,
+and AI-ready fix prompt:
+
+→ veilguard.dev/pro — $19/month, unlimited full audits
+
+Add VEILGUARD_KEY to your MCP config and run full audit again.
+```
+
+---
+
+## Monthly limit
+
+Pro users get **3 full audits per month**. The counter resets on the 1st of each month.
+
+If you hit the limit, individual scanners (all 13 of them) still run with no limit. Only `full_audit` is capped.
+
+---
+
+## Triggering a full audit
+
+Your AI calls `full_audit` automatically when you use any phrase implying a full security check. You can also ask directly:
+
+- *"Run a full audit on my project"*
+- *"What's my security grade?"*
+- *"Is my app safe to deploy?"*
+- *"Audit my code"*
+
+See [Auto-Scanning](/docs/auto-scanning) for the full list of trigger phrases.

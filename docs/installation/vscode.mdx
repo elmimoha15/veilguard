@@ -1,0 +1,95 @@
+# Install on VS Code
+
+Veilguard works in VS Code when used with an MCP-compatible AI agent extension (such as **GitHub Copilot** with agent mode, or **Continue**).
+
+---
+
+## Automatic setup (recommended)
+
+Open your terminal, `cd` into your project root, and run:
+
+```bash
+npx veilguard-cli init
+```
+
+Veilguard detects the `.vscode/` folder and:
+- Writes the MCP config to `.vscode/mcp.json`
+- Writes `.cursorrules` into your project root (VS Code AI agents read this file too)
+
+Then **restart VS Code**.
+
+---
+
+## Manual setup
+
+### Step 1 — Add the MCP config
+
+Create `.vscode/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": ""
+      }
+    }
+  }
+}
+```
+
+If `.vscode/mcp.json` already has other MCP servers, add the `veilguard` block inside `mcpServers`.
+
+### Step 2 — Add the security rules file
+
+Create `.cursorrules` in your project root. VS Code AI agents read this file to know when to run security scans.
+
+Generate it by running:
+```bash
+npx veilguard-cli init
+```
+
+Or copy the template from the [veilguard repository](https://github.com/elmimoha15/veilguard/blob/main/templates/cursorrules.txt).
+
+### Step 3 — Restart VS Code
+
+Close and reopen VS Code. The MCP server starts on the next launch.
+
+---
+
+## Verify the installation
+
+After restarting, your AI agent should have access to all 14 Veilguard tools. You can verify by asking: *"What MCP tools do you have access to?"*
+
+---
+
+## Add your Pro key
+
+Open `.vscode/mcp.json` and add your license key:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Restart VS Code after saving.
+
+---
+
+## Notes
+
+- The `.vscode/mcp.json` config is **project-level** — run `init` in each project you want protected
+- VS Code reads `.cursorrules` for AI agent instructions (not `.vscode/rules` — keep the file named `.cursorrules`)
+- MCP support in VS Code requires an agent extension with MCP compatibility
+- Node.js 18 or later is required

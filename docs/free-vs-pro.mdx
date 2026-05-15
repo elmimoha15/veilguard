@@ -1,0 +1,84 @@
+# Free vs Pro
+
+---
+
+## Pricing
+
+| | Free | Pro |
+|--|------|-----|
+| **Price** | $0 forever | $19/month or $149/year (save 35%) |
+| **All 13 scanners** | ✅ | ✅ |
+| **Supabase RLS audit** | ✅ | ✅ |
+| **Firebase audit** | ✅ | ✅ |
+| **Full audit with grade** | 🔒 Grade locked | ✅ 3/month |
+| **AI-ready fix prompt** | ❌ | ✅ |
+| **Findings shown** | All findings | All findings |
+| **Fix suggestions** | ✅ | ✅ |
+
+---
+
+## What "depth-limited" means on free
+
+All 13 scanners run on the free tier, but some show fewer results than Pro:
+
+| Scanner | Free | Pro |
+|---------|------|-----|
+| Findings per scan | All findings shown | All findings shown |
+| Fix suggestions | Shown | Shown |
+| Dependency scanning | Critical CVEs only | All severities (critical, high, medium, low) |
+| Git history scan | Current files only | Full history scan |
+| Supply chain check | Top 20 dependencies | All dependencies |
+| Breach context | Hidden | Shown (which real breach each pattern caused) |
+
+---
+
+## What only Pro unlocks
+
+### Letter grade
+Free users who call `full_audit` see all their findings — critical issues, warnings, file locations, fix suggestions — but the letter grade (A+ to F) is hidden until they upgrade.
+
+### AI-ready fix prompt
+The copy-paste block that lets your AI agent fix everything at once in a single request is a Pro-only feature of `full_audit`.
+
+### Full depth on dependency and git scans
+Pro shows all CVE severities (not just critical) and scans your full git history for committed secrets.
+
+---
+
+## How to upgrade
+
+1. Go to [veilguard.dev/pro](https://veilguard.dev/pro)
+2. Complete checkout (Polar)
+3. Your license key arrives by email
+4. Open your IDE's MCP config (see [Configuration](/docs/configuration))
+5. Add the key to `VEILGUARD_KEY`:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+6. Restart your IDE — Pro features activate immediately
+
+---
+
+## Annual plan
+
+The annual plan ($149/year) saves 35% vs monthly ($228/year) and locks in your rate. Both plans include the same features.
+
+---
+
+## Full audit limit
+
+Pro users get **3 full audits per month**. The counter resets on the 1st of every month.
+
+This limit is on `full_audit` only — all 13 individual scanners run with no limit on any tier.

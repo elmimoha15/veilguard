@@ -1,0 +1,77 @@
+# Introduction
+
+**Veilguard** is a silent security scanner for AI coding IDEs. It runs as an MCP (Model Context Protocol) server and gives your AI agent 14 security tools it calls automatically while you build — no commands to run, no dashboards to check.
+
+You just vibe. Veilguard watches.
+
+---
+
+## What problem does it solve?
+
+AI-generated code ships fast. Too fast for manual security reviews. The same patterns that cause real breaches — hardcoded API keys, missing Row Level Security, unsigned webhooks, SQL injection — get generated constantly by AI agents and go unnoticed until production.
+
+Veilguard intercepts them at the moment they're written.
+
+---
+
+## How it works
+
+```
+┌──────────────┐     stdio (MCP)     ┌─────────────────────────┐
+│  Your IDE    │ ◄──────────────────► │  Veilguard MCP Server   │
+│  (Cursor,    │                      │                         │
+│  Windsurf,   │                      │  14 security tools      │
+│  Claude Code │                      │  running locally        │
+│  etc.)       │                      └────────────┬────────────┘
+└──────────────┘                                   │
+                              ┌────────────────────┼────────────────────┐
+                              │                    │                    │
+                         Local scans          OSV.dev API         License API
+                         (your files,         (free, for          (veilguard.dev,
+                          your machine)        CVE data)           Pro only)
+```
+
+1. Your IDE starts Veilguard as a local process via `npx`
+2. The IDE talks to Veilguard using the MCP protocol over stdio
+3. Your AI agent calls Veilguard tools at the right moments (after writing a file, before deploying, etc.)
+4. Veilguard scans your local files, matches patterns, returns findings
+5. Your AI presents findings in plain English and offers to fix them
+
+**Everything runs locally.** Veilguard reads files on your machine. It never uploads your code, never sends file contents anywhere, never modifies your database.
+
+---
+
+## The 14 tools at a glance
+
+| Tool | What it catches | Available |
+|------|----------------|-----------|
+| `scan_secrets` | Hardcoded API keys, tokens, passwords (60+ patterns) | Free |
+| `check_env` | `.env` not gitignored, `NEXT_PUBLIC_` secret exposure | Free |
+| `scan_webhooks` | Unverified Stripe, Paystack, M-Pesa, GitHub webhooks | Free |
+| `scan_injection` | SQL injection, NoSQL injection, command injection | Free |
+| `check_cors` | Wildcard CORS, missing origin filtering | Free |
+| `check_supply_chain` | Malicious and typosquatted npm packages | Free |
+| `check_auth_config` | Clerk, NextAuth, Supabase Auth misconfigurations | Free |
+| `check_headers` | Missing CSP, HSTS, X-Frame-Options on a live URL | Free |
+| `check_git` | Secrets in git history, `.gitignore` gaps | Free |
+| `scan_dependencies` | Known CVEs in your npm packages (via OSV.dev) | Free |
+| `check_supabase_rls` | Deep Supabase Row Level Security audit | Free |
+| `check_firebase` | Firebase security rules analysis | Free |
+| `scan_app_security` | Rate limiting, IDOR, password storage, file uploads, error exposure, sensitive logging, open redirects, mass assignment | Free |
+| `full_audit` | All 13 scanners + grade (A+ to F) + AI-ready fix prompt | **Pro** |
+
+---
+
+## Clean scan = total silence
+
+If Veilguard finds nothing, it says nothing. Your AI agent never mentions it ran. No "all clear" banners, no popups, no noise.
+
+Only when something is wrong does it speak — in plain English, describing the real-world consequence, not scanner jargon.
+
+---
+
+## Next steps
+
+- [Quick Start](/docs/quickstart) — get set up in 30 seconds
+- [Installation](/docs/installation/windsurf) — per-IDE setup guides
+- [Scanners](/docs/scanners) — what each tool checks in detail

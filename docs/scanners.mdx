@@ -1,0 +1,217 @@
+# Scanners
+
+Veilguard has **14 security tools**. Thirteen run for all users. One (`full_audit`) requires a Pro license for the grade and AI fix prompt.
+
+Every scanner runs locally on your machine. No code is uploaded.
+
+---
+
+## Free scanners
+
+### `scan_secrets`
+**Scans for hardcoded API keys, tokens, and passwords across 60+ providers.**
+
+Detects secrets from: Stripe, Supabase, OpenAI, Anthropic, Paystack, Flutterwave, M-Pesa, AWS, GitHub, Twilio, SendGrid, Resend, Cloudflare, Vercel, Railway, and more.
+
+Also catches **fallback trap keys** — patterns like `process.env.STRIPE_KEY || "sk_live_..."` where a real key is used as a fallback value.
+
+**When it runs:** after every file create or modify  
+**Input:** `directory` — absolute path to project root
+
+---
+
+### `check_env`
+**Verifies your environment variable setup is safe.**
+
+Checks:
+- `.env`, `.env.local`, `.env.production` are listed in `.gitignore`
+- No secrets are prefixed with `NEXT_PUBLIC_` or `VITE_` (these get bundled into client-side code)
+- `.env` files are not tracked by git
+
+**When it runs:** after modifying `.env`, `.gitignore`, `next.config.js`, or any config file  
+**Input:** `directory`
+
+---
+
+### `scan_webhooks`
+**Finds webhook endpoints that don't verify the request signature.**
+
+A webhook without signature verification means anyone can fake a payment event and trigger your fulfillment logic for free.
+
+Checks:
+- **Stripe** — `constructEvent()` present
+- **Paystack** — `X-Paystack-Signature` HMAC verification
+- **M-Pesa** — Safaricom IP validation
+- **GitHub** — `X-Hub-Signature-256` verification
+- **Flutterwave** — `verifyTransactionHash`
+
+**When it runs:** after creating or modifying API routes or webhook handlers  
+**Input:** `directory`
+
+---
+
+### `scan_injection`
+**Detects SQL injection, NoSQL injection, and command injection vulnerabilities.**
+
+Checks:
+- Template literals used directly in SQL queries
+- Unsanitized `req.body` passed to database calls
+- `exec()`, `execSync()`, `eval()`, `child_process` with user input
+- NoSQL query injection patterns
+- XSS via `innerHTML` or `dangerouslySetInnerHTML`
+- **IDOR** — `req.params.id` used in DB query without ownership check
+- **Mass assignment** — `...req.body` or `Object.assign({}, req.body)` passed directly to database
+
+**When it runs:** after creating or modifying API routes  
+**Input:** `directory`
+
+---
+
+### `check_cors`
+**Detects CORS misconfigurations that expose your API to any website.**
+
+Checks:
+- `cors({ origin: '*' })` on apps with authentication
+- Missing origin filtering
+- `cors()` called with no options
+
+A wildcard CORS origin means any website on the internet can make authenticated requests to your API using your users' cookies.
+
+**When it runs:** after modifying config files  
+**Input:** `directory`
+
+---
+
+### `check_supply_chain`
+**Detects malicious and typosquatted npm packages.**
+
+AI tools occasionally suggest packages with names that closely resemble popular ones but are actually malicious (e.g. `expres` instead of `express`, `cross-env2` vs `cross-env`). This scanner checks your `package.json` against a database of known bad packages.
+
+**When it runs:** after modifying `package.json` or running `npm install`  
+**Input:** `directory`
+
+---
+
+### `check_auth_config`
+**Validates your authentication setup for common misconfigurations.**
+
+Detects the auth provider in use (Clerk, NextAuth, Supabase Auth) and checks:
+- `getSession()` used instead of `getUser()` on the frontend (session data can be spoofed client-side)
+- Session tokens stored in `localStorage` (vulnerable to XSS; use `httpOnly` cookies)
+- Missing rate limiting on auth endpoints
+- Email verification not enforced
+
+**When it runs:** after modifying auth config or route files  
+**Input:** `directory`
+
+---
+
+### `check_headers`
+**Checks security headers on a live deployed URL.**
+
+Makes an HTTP request to your deployed app and verifies the response includes:
+- `Content-Security-Policy`
+- `Strict-Transport-Security`
+- `X-Frame-Options`
+- `X-Content-Type-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+
+Missing headers leave users vulnerable to clickjacking, MIME sniffing, and cross-site attacks.
+
+**When it runs:** before deploy, or when called manually  
+**Input:** `url` — the deployed URL (e.g. `https://myapp.vercel.app`)
+
+> Note: `check_headers` is the only scanner that takes a `url` parameter instead of `directory`.
+
+---
+
+### `check_git`
+**Checks your git setup for security gaps.**
+
+Checks:
+- `.env` files tracked by git (committed secrets)
+- `node_modules/` committed
+- `.gitignore` missing critical entries
+- Sensitive file patterns in git history
+
+**When it runs:** after modifying `.gitignore` or git-tracked files  
+**Input:** `directory`
+
+---
+
+### `scan_dependencies`
+**Checks all npm packages for known CVEs using Google's OSV.dev database.**
+
+Reads your `package-lock.json` or `yarn.lock`, queries OSV.dev for each package, and reports known vulnerabilities with severity levels.
+
+**When it runs:** after modifying `package.json`  
+**Input:** `directory`
+
+---
+
+### `check_supabase_rls`
+**Deep audit of Supabase Row Level Security policies.**
+
+Goes beyond "RLS is enabled" — checks the policy *content* for bypass patterns that let authenticated users read other users' data:
+
+- `USING (true)` — anyone can access all rows
+- `USING (auth.role() = 'authenticated')` without `auth.uid()` check — any logged-in user sees everything
+- `USING (auth.uid() IS NOT NULL)` — same problem
+- `SELECT *` without a user filter
+- Tables with RLS enabled but no policies defined (blocks all access, often unintentional)
+
+The patterns that caused the Moltbook and Lovable breaches are explicitly in scope.
+
+**When it runs:** after creating or modifying Supabase migrations, SQL files, or RLS policies  
+**Input:** `directory`
+
+---
+
+### `check_firebase`
+**Analyzes Firebase Realtime Database and Firestore security rules.**
+
+Checks for:
+- `".read": true` or `".write": true` at any node (public access)
+- Rules that allow writes without auth checks
+- Client-controlled auth patterns
+- Missing restrictions on sensitive collections
+
+**When it runs:** after modifying Firebase rules files  
+**Input:** `directory`
+
+---
+
+### `scan_app_security`
+**Application-layer security checks for common logic vulnerabilities.**
+
+Covers eight categories:
+
+| Check | What it detects |
+|-------|----------------|
+| **Rate limiting** | POST, payment, and auth routes with no rate limiter |
+| **IDOR** | Handlers using `req.params.id` without checking the current user owns the resource |
+| **Password storage** | Plaintext passwords, MD5/SHA-1 hashing, bcrypt with low cost factor |
+| **File uploads** | `multer()` with no file size limit, no MIME type filter, or uploads stored in a public folder |
+| **Error exposure** | Stack traces or raw error objects returned in HTTP responses |
+| **Sensitive logging** | `console.log` of passwords, tokens, emails, or card data |
+| **Open redirects** | Unvalidated `redirect` params that can send users to attacker-controlled URLs |
+| **Mass assignment** | `...req.body` or `Object.assign({}, req.body)` passed directly to a database call |
+
+**When it runs:** after modifying API route files  
+**Input:** `directory`
+
+---
+
+## Pro scanner
+
+### `full_audit`
+**Runs all 13 scanners and produces a graded report with an AI-ready fix prompt.**
+
+See the [Full Audit](/docs/full-audit) page for the complete breakdown.
+
+**Requires:** `VEILGUARD_KEY` set in your MCP config  
+**Limit:** 3 audits per month (resets on the 1st)  
+**Input:** `directory`
+
+Free users can call `full_audit` — they see all findings in plain English but the letter grade is locked until they upgrade.

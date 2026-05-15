@@ -1,0 +1,131 @@
+# Configuration
+
+---
+
+## The MCP config
+
+Every IDE uses the same JSON block — only the file path differs. This is the config that `npx veilguard-cli init` writes automatically:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": ""
+      }
+    }
+  }
+}
+```
+
+### Where to put it
+
+| IDE | Config file path | Scope |
+|-----|-----------------|-------|
+| **Windsurf** | `~/.windsurf/mcp.json` | Global (all projects) |
+| **Cursor** | `.cursor/mcp.json` | Project-level |
+| **VS Code** | `.vscode/mcp.json` | Project-level |
+| **Claude Code** | `.claude/mcp.json` | Project-level |
+| **Antigravity** | `.gemini/mcp.json` | Project-level |
+
+---
+
+## Adding your Pro key
+
+If you're on the free tier, leave `VEILGUARD_KEY` empty (or remove the `env` block entirely). If you have a Pro license:
+
+1. Open the MCP config file for your IDE (table above)
+2. Paste your license key into the `VEILGUARD_KEY` field:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+3. **Restart your IDE**
+
+Pro features activate immediately on next startup. Get a key at [veilguard.dev/pro](https://veilguard.dev/pro).
+
+---
+
+## How license validation works
+
+- Key is validated against `veilguard.dev` on IDE startup
+- Result is **cached locally for 24 hours** — you won't lose Pro access if you go offline
+- After the first successful validation, the tool works fully offline for 24 hours
+- If validation fails (wrong key, expired): falls back to free tier gracefully
+- No code is ever sent to the license server — only the key itself
+
+---
+
+## Environment variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `VEILGUARD_KEY` | Pro license key | No — free tier works without it |
+| `VEILGUARD_LOG_LEVEL` | Log verbosity: `debug`, `info`, `warn`, `error` | No (default: `info`) |
+
+To set `VEILGUARD_LOG_LEVEL`, add it alongside your key in the MCP config `env` block:
+
+```json
+"env": {
+  "VEILGUARD_KEY": "",
+  "VEILGUARD_LOG_LEVEL": "debug"
+}
+```
+
+---
+
+## Suppressing false positives
+
+Create a `.veilguardignore` file in your project root. It uses the same format as `.gitignore`:
+
+```
+# Ignore test fixtures
+tests/fixtures/
+tests/vulnerable-app/
+
+# Ignore a specific file
+src/legacy/old-api.ts
+
+# Ignore a pattern
+**/*.mock.ts
+```
+
+Any file matching a pattern in `.veilguardignore` will be skipped by all scanners.
+
+---
+
+## The `.veilguard/` folder
+
+Veilguard stores scan state in a `.veilguard/` folder in your project root. The `init` command automatically adds this to your `.gitignore` — you should never commit it.
+
+If you ran `init` on an existing project that already has a `.gitignore`, the entry is appended automatically:
+
+```
+# Veilguard scan results
+.veilguard/
+```
+
+---
+
+## Updating the config after initial install
+
+If you installed Veilguard without a Pro key and later upgraded:
+
+1. Find your MCP config (table above)
+2. Add `VEILGUARD_KEY` to the `env` block
+3. Restart your IDE
+
+No need to re-run `npx veilguard-cli init`.

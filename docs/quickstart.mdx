@@ -1,0 +1,129 @@
+# Quick Start
+
+Get Veilguard protecting your project in under 30 seconds.
+
+---
+
+## Prerequisite
+
+Node.js **18 or later** must be installed. Check with:
+
+```bash
+node --version
+```
+
+---
+
+## One command
+
+Open your terminal, `cd` into your project root, and run:
+
+```bash
+npx veilguard-cli init
+```
+
+That's it. The init command:
+
+1. **Detects your IDE** — checks for `.cursor/`, `.windsurf/`, `.vscode/`, `.claude/`, `.gemini/`, or `CLAUDE.md`
+2. **Writes the MCP config** — puts the right JSON file where your IDE expects it
+3. **Copies the security rules file** — `.cursorrules`, `.windsurfrules`, `CLAUDE.md`, or `.antigravityrules` depending on your IDE
+4. **Updates your `.gitignore`** — adds `.veilguard/` so scan caches don't get committed
+
+Then **restart your IDE** and Veilguard is active.
+
+---
+
+## What you'll see in the terminal
+
+**Windsurf detected:**
+```
+  🛡️  Veilguard — Silent security for vibe coders
+
+  ✓ Windsurf detected
+    Created: .windsurfrules
+    Created: .windsurf/mcp.json
+
+  Veilguard is now protecting this project.
+  Free users: all 13 scanners active (depth-limited).
+  Pro users: add VEILGUARD_KEY to your MCP config.
+  → veilguard.dev/pro
+```
+
+**Cursor detected:**
+```
+  🛡️  Veilguard — Silent security for vibe coders
+
+  ✓ Cursor detected
+    Created: .cursorrules
+    Created: .cursor/mcp.json
+
+  Veilguard is now protecting this project.
+```
+
+**Claude Code detected:**
+```
+  🛡️  Veilguard — Silent security for vibe coders
+
+  ✓ Claude Code detected
+    Created: CLAUDE.md
+    Created: .claude/mcp.json
+    Created: .claude/hooks.json
+
+  Veilguard is now protecting this project.
+```
+
+**No IDE detected** (installs rules for all assistants):
+```
+  🛡️  Veilguard — Silent security for vibe coders
+
+  ✓ No IDE detected — installed rules for every supported assistant
+    Created: .windsurfrules
+    Created: .cursorrules
+    Created: CLAUDE.md
+    Created: .antigravityrules
+    Created: .claude/hooks.json
+    MCP config: add to your IDE manually using templates/mcp-config.json
+
+  Veilguard is now protecting this project.
+```
+
+---
+
+## After setup
+
+**Restart your IDE.** The MCP server starts the next time your IDE launches.
+
+From that point, your AI agent will:
+- Scan files automatically as you build
+- Stay silent if scans are clean
+- Alert you in plain English if something risky is found
+
+---
+
+## Manual setup
+
+If `npx veilguard-cli init` doesn't detect your IDE, or you prefer to configure manually, see the [Installation guides](/docs/installation/windsurf) for per-IDE instructions.
+
+---
+
+## Add your Pro key (optional)
+
+If you have a Pro license, open the MCP config file your IDE is using and add your key:
+
+```json
+{
+  "mcpServers": {
+    "veilguard": {
+      "command": "npx",
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "env": {
+        "VEILGUARD_KEY": "your_key_here"
+      }
+    }
+  }
+}
+```
+
+Restart your IDE after saving. Pro features activate immediately.
+
+Get a key at [veilguard.dev/pro](https://veilguard.dev/pro).

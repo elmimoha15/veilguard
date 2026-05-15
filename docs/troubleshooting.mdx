@@ -1,0 +1,147 @@
+# Troubleshooting
+
+---
+
+## Veilguard isn't scanning automatically
+
+**Check 1: Does the rules file exist?**
+
+| IDE | Expected file |
+|-----|--------------|
+| Windsurf | `.windsurfrules` in project root |
+| Cursor | `.cursorrules` in project root |
+| VS Code | `.cursorrules` in project root |
+| Claude Code | `CLAUDE.md` in project root |
+| Antigravity | `.antigravityrules` in project root |
+
+If the file is missing, re-run:
+```bash
+npx veilguard-cli init
+```
+
+**Check 2: Is the MCP config valid JSON?**
+
+Open your IDE's MCP config file and paste the contents into [jsonlint.com](https://jsonlint.com). A syntax error will prevent Veilguard from loading.
+
+**Check 3: Restart your IDE**
+
+The MCP server only starts when the IDE launches. After any config change, a full restart is required (not just a reload window).
+
+**Check 4: Check that Node.js ≥ 18 is on your PATH**
+
+```bash
+node --version
+# should be v18.x.x or higher
+```
+
+---
+
+## Pro key isn't working
+
+**Check 1: Restart your IDE**
+
+The license is validated on startup. A window reload is not enough — close and reopen the IDE.
+
+**Check 2: Internet connection**
+
+The first validation requires an internet connection to `veilguard.dev`. After a successful first validation, the result is cached for 24 hours and works offline.
+
+**Check 3: Key format**
+
+Keys look like `vg_live_xxxxxxxxxxxxxxxxxxxx`. Paste the key exactly as it appeared in your email — no extra spaces or quotes.
+
+**Check 4: Check the env block**
+
+```json
+"env": {
+  "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+The key must be inside the `env` object, not at the top level of the config.
+
+---
+
+## Scanner returns false positives
+
+Create a `.veilguardignore` file in your project root:
+
+```
+# Skip test fixtures
+tests/fixtures/
+tests/vulnerable-app/
+
+# Skip a specific file
+src/legacy/old-api.ts
+```
+
+This file uses the same syntax as `.gitignore`. Any path matching a pattern is skipped by all scanners.
+
+---
+
+## `full_audit` says "3/3 used"
+
+The monthly limit resets on the **1st of each month**. Until then, all 13 individual scanners still work — only `full_audit` is capped.
+
+To run an equivalent check manually, ask your AI to call each scanner in sequence: `scan_secrets`, `check_env`, `scan_injection`, `scan_webhooks`, `check_cors`, `check_supply_chain`, `check_auth_config`, `check_git`, `scan_dependencies`, `check_supabase_rls`, `check_firebase`, `scan_app_security`.
+
+---
+
+## Pattern files not loading
+
+This usually happens when running Veilguard from source (not via npm).
+
+**Check:** Is the `patterns/` directory in the same location as `dist/`?
+
+```
+project/
+├── dist/          ← built output
+└── patterns/      ← must be here
+```
+
+**If using npm:** check that `"files"` in `package.json` includes `"patterns/"`. Veilguard's published package includes it by default.
+
+---
+
+## Build fails (for contributors)
+
+```bash
+# Check Node version
+node --version   # must be >= 18
+
+# Install dependencies first
+npm install
+
+# Build
+npm run build
+
+# Type check
+npm run typecheck
+```
+
+If `typecheck` fails, the error output will point to the specific file and line.
+
+---
+
+## MCP server not showing up in IDE
+
+**Windsurf:** Tools panel → MCP → check Veilguard is listed and green
+
+**Cursor:** Settings → MCP → verify the server entry exists
+
+**Claude Code:**
+```bash
+claude mcp list
+# should show: veilguard
+```
+
+If Veilguard isn't listed, verify the MCP config file path is correct and the JSON is valid, then restart.
+
+---
+
+## Still stuck?
+
+Open an issue at [github.com/elmimoha15/veilguard](https://github.com/elmimoha15/veilguard) with:
+- Your IDE and version
+- The MCP config you're using (redact `VEILGUARD_KEY`)
+- The error message or behavior you're seeing
