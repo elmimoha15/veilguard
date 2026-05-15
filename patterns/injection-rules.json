@@ -64,5 +64,39 @@
     "severity": "warning",
     "fix": "Avoid dangerouslySetInnerHTML. If necessary, sanitize with DOMPurify first.",
     "cwe": "CWE-79"
+  },
+  {
+    "id": "idor-params-id",
+    "name": "Insecure Direct Object Reference (IDOR)",
+    "pattern": "\\.(findById|findOne|findUnique|update|delete|deleteOne|updateOne)\\s*\\(\\s*\\{?\\s*(id|_id)?\\s*:?\\s*req\\.(params|query)\\.id",
+    "severity": "critical",
+    "fix": "Always check ownership before reading/mutating: ensure the requesting user owns the resource (e.g. WHERE id = $1 AND user_id = $2).",
+    "cwe": "CWE-639",
+    "breach_precedent": "IDOR is OWASP Top 10. Optus 2022 breach: 9.8M records exposed via missing ownership check on /api/users/:id."
+  },
+  {
+    "id": "idor-prisma-where-id-only",
+    "name": "Prisma query keyed only by req.params.id (likely IDOR)",
+    "pattern": "where\\s*:\\s*\\{\\s*id\\s*:\\s*req\\.(params|query)\\.(id|userId|orderId)",
+    "severity": "critical",
+    "fix": "Add the current user to the where clause: where: { id: req.params.id, userId: req.user.id }.",
+    "cwe": "CWE-639"
+  },
+  {
+    "id": "mass-assignment-spread",
+    "name": "Mass assignment via ...req.body spread",
+    "pattern": "\\.(create|update|insert|save|updateOne|findOneAndUpdate)\\s*\\([^)]*\\.\\.\\.req\\.body",
+    "severity": "critical",
+    "fix": "Never spread req.body into a database write. Whitelist fields with Zod/Yup or pick only the allowed keys (e.g. { title, body } = req.body).",
+    "cwe": "CWE-915",
+    "breach_precedent": "GitHub 2012: mass assignment let any user grant themselves admin by adding `is_admin: true` to a PATCH body."
+  },
+  {
+    "id": "mass-assignment-object-assign",
+    "name": "Mass assignment via Object.assign(user, req.body)",
+    "pattern": "Object\\.assign\\s*\\([^,]+,\\s*req\\.body",
+    "severity": "critical",
+    "fix": "Do not merge req.body straight into a model. Whitelist fields with a schema validator before updating.",
+    "cwe": "CWE-915"
   }
 ]

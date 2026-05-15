@@ -1,0 +1,67 @@
+[
+  {
+    "id": "password-plaintext-insert",
+    "name": "Plain-text password written to database",
+    "pattern": "\\.(insert|create|save|update|updateOne|findOneAndUpdate)\\s*\\([^)]*password\\s*:\\s*req\\.body\\.password",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Hash the password with bcrypt or argon2 before storing: const hash = await bcrypt.hash(req.body.password, 12).",
+    "cwe": "CWE-256",
+    "breach_precedent": "RockYou 2009: 32M plain-text passwords leaked. Adobe 2013: 153M weakly-hashed passwords leaked."
+  },
+  {
+    "id": "password-md5",
+    "name": "Weak password hashing (MD5)",
+    "pattern": "crypto\\.createHash\\s*\\(\\s*['\"]md5['\"]\\s*\\)[^;]*password",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "MD5 is broken for passwords. Use bcrypt (cost >= 12) or argon2.",
+    "cwe": "CWE-327"
+  },
+  {
+    "id": "password-sha1",
+    "name": "Weak password hashing (SHA-1)",
+    "pattern": "crypto\\.createHash\\s*\\(\\s*['\"]sha1['\"]\\s*\\)[^;]*password",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "SHA-1 is broken for passwords. Use bcrypt (cost >= 12) or argon2.",
+    "cwe": "CWE-327"
+  },
+  {
+    "id": "password-sha256-unsalted",
+    "name": "Unsalted SHA-256 used for password",
+    "pattern": "crypto\\.createHash\\s*\\(\\s*['\"]sha256['\"]\\s*\\)[^;]*\\.update\\([^)]*password",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Plain SHA-256 is too fast and easy to rainbow-table. Use bcrypt or argon2.",
+    "cwe": "CWE-916"
+  },
+  {
+    "id": "bcrypt-low-cost",
+    "name": "bcrypt cost factor too low",
+    "pattern": "bcrypt\\.(hash|hashSync)\\s*\\([^,]+,\\s*([1-9]|10)\\b",
+    "severity": "warning",
+    "category": "auth",
+    "fix": "Use a bcrypt cost factor of 12 or higher: bcrypt.hash(pw, 12).",
+    "cwe": "CWE-916"
+  },
+  {
+    "id": "open-redirect-query",
+    "name": "Open redirect using req.query / req.body",
+    "pattern": "res\\.redirect\\s*\\(\\s*req\\.(query|body|params)\\.(redirect|url|next|return|returnTo)",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Validate the redirect target against an allowlist of paths or hostnames before calling res.redirect.",
+    "cwe": "CWE-601",
+    "breach_precedent": "Open redirects are the standard last hop in phishing chains and OAuth account takeovers."
+  },
+  {
+    "id": "open-redirect-window",
+    "name": "Open redirect via window.location = req.query",
+    "pattern": "window\\.location\\s*(\\.href)?\\s*=\\s*[^;]*\\.(query|search|hash)",
+    "severity": "warning",
+    "category": "auth",
+    "fix": "Never assign window.location from untrusted query strings without an allowlist.",
+    "cwe": "CWE-601"
+  }
+]

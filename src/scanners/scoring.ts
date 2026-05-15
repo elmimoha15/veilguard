@@ -1,28 +1,118 @@
 import type { Finding, ScanResult } from '../types.js';
 
-/** Calculate security score from findings */
+/**
+ * Per-finding score impact, weighted by real-world impact.
+ * Matched in priority order — first matching rule wins.
+ * Falls back to severity-based defaults if nothing matches.
+ */
+interface ScoreRule {
+  match: (f: Finding) => boolean;
+  penalty: number;
+}
+
+const SCORE_RULES: ScoreRule[] = [
+  // ── Critical, high-impact ─────────────────────────────────
+  // Hardcoded secrets / fallback trap keys
+  { match: (f) => f.category === 'secret' || f.id.startsWith('secret-'), penalty: 20 },
+  // Missing webhook signature verification
+  { match: (f) => f.category === 'webhook' || f.id.startsWith('webhook-'), penalty: 20 },
+  // SQL / NoSQL / command injection (everything in the injection scanner except XSS+IDOR+mass-assign)
+  {
+    match: (f) =>
+      (f.id.startsWith('injection-sql') ||
+        f.id.startsWith('injection-nosql') ||
+        f.id.startsWith('injection-command') ||
+        f.id === 'injection-unsanitized-body-insert'),
+    penalty: 20,
+  },
+  // Missing Supabase RLS / open Firebase rules
+  {
+    match: (f) =>
+      f.category === 'rls' ||
+      f.id.startsWith('rls-') ||
+      f.category === 'firebase' ||
+      f.id.startsWith('firebase-'),
+    penalty: 20,
+  },
+  // IDOR
+  {
+    match: (f) =>
+      f.category === 'idor' ||
+      f.id === 'injection-idor-params-id' ||
+      f.id === 'injection-idor-prisma-where-id-only' ||
+      f.id === 'idor-handler-scope',
+    penalty: 20,
+  },
+  // Mass assignment
+  {
+    match: (f) =>
+      f.id === 'injection-mass-assignment-spread' ||
+      f.id === 'injection-mass-assignment-object-assign',
+    penalty: 15,
+  },
+  // Missing rate limiting on auth / payment routes
+  {
+    match: (f) =>
+      f.id === 'auth-no-rate-limit' ||
+      f.id === 'rate-limit-missing-payment',
+    penalty: 15,
+  },
+  // CORS wildcard / misconfig
+  { match: (f) => f.category === 'cors' || f.id.startsWith('cors-'), penalty: 10 },
+  // Sensitive data in logs
+  { match: (f) => f.id === 'sensitive-log' || f.category === 'logging', penalty: 10 },
+  // Error stack / verbose error exposure
+  {
+    match: (f) => f.id === 'error-stack-exposed' || f.category === 'error-exposure',
+    penalty: 8,
+  },
+  // Missing security headers
+  { match: (f) => f.category === 'headers' || f.id.startsWith('header-'), penalty: 5 },
+];
+
+/** Calculate security score from findings, weighted by real-world impact. */
 export function calculateScore(findings: Finding[]): { score: number; grade: string } {
   let score = 100;
 
   for (const f of findings) {
-    switch (f.severity) {
-      case 'critical':
-        score -= 15;
-        break;
-      case 'warning':
-        score -= 5;
-        break;
-      case 'info':
-        score -= 1;
-        break;
-      case 'passed':
-        break;
+    if (f.severity === 'passed' || f.severity === 'info') {
+      if (f.severity === 'info') score -= 1;
+      continue;
     }
+
+    const rule = SCORE_RULES.find((r) => r.match(f));
+    if (rule) {
+      score -= rule.penalty;
+      continue;
+    }
+
+    // Severity-based fallback for any uncategorized finding.
+    score -= f.severity === 'critical' ? 15 : 5;
   }
 
   score = Math.max(0, score);
   const grade = scoreToGrade(score);
   return { score, grade };
+}
+
+/** Plain-English explanation for what each grade means to a vibe coder. */
+export function gradeMeaning(grade: string): string {
+  switch (grade) {
+    case 'A+':
+    case 'A':
+      return 'Your app is production-ready. Excellent security hygiene.';
+    case 'B+':
+    case 'B':
+      return 'Good security. A few improvements recommended before scaling.';
+    case 'C+':
+    case 'C':
+      return 'Moderate risk. Fix warnings before you get real users.';
+    case 'D':
+      return 'High risk. Critical issues present. Fix before deploying.';
+    case 'F':
+    default:
+      return 'Do NOT deploy. Your app has critical vulnerabilities that attackers actively exploit.';
+  }
 }
 
 function scoreToGrade(score: number): string {
