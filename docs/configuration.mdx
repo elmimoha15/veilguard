@@ -4,7 +4,7 @@
 
 ## The MCP config
 
-Every IDE uses the same JSON block — only the file path differs. This is the config that `npx veilguard-cli init` writes automatically:
+Every IDE uses the same JSON block — only the file path differs:
 
 ```json
 {
@@ -109,9 +109,7 @@ Any file matching a pattern in `.veilguardignore` will be skipped by all scanner
 
 ## The `.veilguard/` folder
 
-Veilguard stores scan state in a `.veilguard/` folder in your project root. The `init` command automatically adds this to your `.gitignore` — you should never commit it.
-
-If you ran `init` on an existing project that already has a `.gitignore`, the entry is appended automatically:
+Veilguard stores scan state in a `.veilguard/` folder in your project root. Add it to your `.gitignore`:
 
 ```
 # Veilguard scan results
@@ -120,12 +118,12 @@ If you ran `init` on an existing project that already has a `.gitignore`, the en
 
 ---
 
-## Updating the config after initial install
+## Upgrading to Pro after initial setup
 
-If you installed Veilguard without a Pro key and later upgraded:
+If you set up Veilguard on the free tier and later bought a Pro license:
 
 1. Find your MCP config (table above)
 2. Add `VEILGUARD_KEY` to the `env` block
 3. Restart your IDE
 
-No need to re-run `npx veilguard-cli init`.
+No other changes needed.

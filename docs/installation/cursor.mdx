@@ -2,29 +2,9 @@
 
 ---
 
-## Automatic setup (recommended)
+## Step 1 — Add the MCP config
 
-Open your terminal, `cd` into your project root, and run:
-
-```bash
-npx veilguard-cli init
-```
-
-Veilguard detects the `.cursor/` folder and:
-- Writes the MCP config to `.cursor/mcp.json`
-- Writes `.cursorrules` into your project root
-
-Then **restart Cursor**.
-
----
-
-## Manual setup
-
-### Step 1 — Add the MCP config
-
-Cursor uses a **project-level** MCP config at `.cursor/mcp.json` inside your project folder.
-
-Create the `.cursor/` directory if it doesn't exist, then create `.cursor/mcp.json`:
+Create `.cursor/mcp.json` in your project folder:
 
 ```json
 {
@@ -40,75 +20,49 @@ Create the `.cursor/` directory if it doesn't exist, then create `.cursor/mcp.js
 }
 ```
 
-If the file already has other MCP servers, add the `veilguard` block inside `mcpServers`.
-
-### Step 2 — Add the security rules file
-
-Create `.cursorrules` in your project root. This file tells Cursor's AI agent when to run security scans automatically.
-
-Generate it by running:
-```bash
-npx veilguard-cli init
-```
-
-Or copy the template from the [veilguard repository](https://github.com/elmimoha15/veilguard/blob/main/templates/cursorrules.txt).
-
-### Step 3 — Restart Cursor
-
-Close and reopen Cursor completely. The MCP server starts on the next launch.
+If `.cursor/mcp.json` already exists with other servers, add the `veilguard` block inside `mcpServers`.
 
 ---
 
-## Verify the installation
+## Step 2 — Add the rules file (recommended)
 
-After restarting:
+Download [`.cursorrules`](https://raw.githubusercontent.com/elmimoha15/veilguard/main/templates/cursorrules.txt) and save it to your project root.
+
+This file tells Cursor's AI agent exactly when to call each Veilguard tool. Without it, the tools still work but won't fire automatically.
+
+---
+
+## Step 3 — Restart Cursor
+
+Close and reopen Cursor completely.
+
+---
+
+## Verify
 
 1. Open **Cursor Settings** → **MCP**
-2. **Veilguard** should appear in the list with a green status
+2. **Veilguard** should appear with a green status
 
-Or ask the AI agent: *"What Veilguard tools do you have?"* — it should list all 14 tools.
+Or ask the agent: *"What Veilguard tools do you have access to?"*
 
 ---
 
-## Add your Pro key
+## Pro key
 
-Open `.cursor/mcp.json` and add your license key:
+To activate Pro, add your license key to `.cursor/mcp.json`:
 
 ```json
-{
-  "mcpServers": {
-    "veilguard": {
-      "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
-      "env": {
-        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
-      }
-    }
-  }
+"env": {
+  "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
 }
 ```
 
-Restart Cursor after saving.
-
----
-
-## How auto-scanning works in Cursor
-
-The `.cursorrules` file instructs Cursor's AI agent to call Veilguard tools at specific moments:
-
-- After you write or modify any file → `scan_secrets`
-- After you create an API route → `scan_webhooks` + `scan_injection`
-- After you change a Supabase migration or SQL file → `check_supabase_rls`
-- After you modify `package.json` → `check_supply_chain` + `scan_dependencies`
-- When you say "deploy", "go live", "ship it" → `full_audit`
-
-Clean scans produce no output. The agent stays silent unless something is found.
+Restart Cursor after saving. Get a key at [veilguard.dev/pro](https://veilguard.dev/pro).
 
 ---
 
 ## Notes
 
-- The `.cursor/mcp.json` config is **project-level** — you need to set it up in each project
-- If you want Veilguard in all projects, Cursor also supports a global MCP config in settings
-- `.cursorrules` is project-level — run `init` in each project you want protected
+- `.cursor/mcp.json` is **project-level** — add it to each project you want protected
+- `.cursorrules` is also project-level
 - Node.js 18 or later is required

@@ -1,34 +1,16 @@
 # Install on VS Code
 
-Veilguard works in VS Code when used with an MCP-compatible AI agent extension (such as **GitHub Copilot** with agent mode, or **Continue**).
+Veilguard works in VS Code with MCP-compatible AI extensions such as **GitHub Copilot** (agent mode) or **Continue**.
 
 ---
 
-## Automatic setup (recommended)
+## Step 1 — Add the MCP config
 
-Open your terminal, `cd` into your project root, and run:
-
-```bash
-npx veilguard-cli init
-```
-
-Veilguard detects the `.vscode/` folder and:
-- Writes the MCP config to `.vscode/mcp.json`
-- Writes `.cursorrules` into your project root (VS Code AI agents read this file too)
-
-Then **restart VS Code**.
-
----
-
-## Manual setup
-
-### Step 1 — Add the MCP config
-
-Create `.vscode/mcp.json` in your project root:
+Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), search **"Preferences: Open User Settings (JSON)"**, and add:
 
 ```json
-{
-  "mcpServers": {
+"mcp": {
+  "servers": {
     "veilguard": {
       "command": "npx",
       "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
@@ -40,56 +22,49 @@ Create `.vscode/mcp.json` in your project root:
 }
 ```
 
-If `.vscode/mcp.json` already has other MCP servers, add the `veilguard` block inside `mcpServers`.
-
-### Step 2 — Add the security rules file
-
-Create `.cursorrules` in your project root. VS Code AI agents read this file to know when to run security scans.
-
-Generate it by running:
-```bash
-npx veilguard-cli init
-```
-
-Or copy the template from the [veilguard repository](https://github.com/elmimoha15/veilguard/blob/main/templates/cursorrules.txt).
-
-### Step 3 — Restart VS Code
-
-Close and reopen VS Code. The MCP server starts on the next launch.
+> **Alternative:** You can also add this to `.vscode/settings.json` in your project for project-level config.
 
 ---
 
-## Verify the installation
+## Step 2 — Add the rules file (recommended)
 
-After restarting, your AI agent should have access to all 14 Veilguard tools. You can verify by asking: *"What MCP tools do you have access to?"*
+Download [`.cursorrules`](https://raw.githubusercontent.com/elmimoha15/veilguard/main/templates/cursorrules.txt) and save it to your project root.
+
+VS Code AI agents read `.cursorrules` to know when to call each Veilguard tool. Without it, the tools still work but won't fire automatically.
 
 ---
 
-## Add your Pro key
+## Step 3 — Restart VS Code
 
-Open `.vscode/mcp.json` and add your license key:
+Close and reopen VS Code completely.
+
+---
+
+## Verify
+
+Ask your AI agent: *"What Veilguard tools do you have access to?"*
+
+It should list 14 security tools.
+
+---
+
+## Pro key
+
+To activate Pro, add your license key to the MCP config:
 
 ```json
-{
-  "mcpServers": {
-    "veilguard": {
-      "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
-      "env": {
-        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
-      }
-    }
-  }
+"env": {
+  "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
 }
 ```
 
-Restart VS Code after saving.
+Restart VS Code after saving. Get a key at [veilguard.dev/pro](https://veilguard.dev/pro).
 
 ---
 
 ## Notes
 
-- The `.vscode/mcp.json` config is **project-level** — run `init` in each project you want protected
-- VS Code reads `.cursorrules` for AI agent instructions (not `.vscode/rules` — keep the file named `.cursorrules`)
-- MCP support in VS Code requires an agent extension with MCP compatibility
+- MCP support in VS Code requires an agent extension with MCP compatibility (e.g. GitHub Copilot agent mode)
+- The settings.json config is **user-level** (all projects) or **project-level** (`.vscode/settings.json`)
+- `.cursorrules` is project-level — add it to each project you want protected
 - Node.js 18 or later is required

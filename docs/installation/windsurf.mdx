@@ -2,29 +2,11 @@
 
 ---
 
-## Automatic setup (recommended)
+## Step 1 — Add the MCP config
 
-Open your terminal, `cd` into your project root, and run:
+Windsurf uses a **global** config at `~/.windsurf/mcp.json`. This applies to all projects.
 
-```bash
-npx veilguard-cli init
-```
-
-Veilguard detects the `~/.windsurf/` folder and:
-- Writes the MCP config to `~/.windsurf/mcp.json`
-- Writes `.windsurfrules` into your project root
-
-Then **restart Windsurf**.
-
----
-
-## Manual setup
-
-### Step 1 — Add the MCP config
-
-Windsurf uses a **global** MCP config at `~/.windsurf/mcp.json` (applies to all projects).
-
-Create or edit that file:
+Create or edit `~/.windsurf/mcp.json`:
 
 ```json
 {
@@ -40,75 +22,49 @@ Create or edit that file:
 }
 ```
 
-If the file already exists with other MCP servers, add the `veilguard` block inside `mcpServers`.
-
-### Step 2 — Add the security rules file
-
-Create `.windsurfrules` in your project root. This file tells Cascade (Windsurf's AI) when to run security scans.
-
-You can generate the file content by running:
-```bash
-npx veilguard-cli init
-```
-
-Or copy the rules template manually from the [veilguard repository](https://github.com/elmimoha15/veilguard/blob/main/templates/windsurfrules.txt).
-
-### Step 3 — Restart Windsurf
-
-Close and reopen Windsurf completely. The MCP server starts on the next launch.
+If the file already exists with other servers, add the `veilguard` block inside `mcpServers`.
 
 ---
 
-## Verify the installation
+## Step 2 — Add the rules file (recommended)
 
-After restarting, check that Veilguard is active:
+Download [`.windsurfrules`](https://raw.githubusercontent.com/elmimoha15/veilguard/main/templates/windsurfrules.txt) and save it to your project root.
 
-1. Open the **Tools** panel in Windsurf
-2. Go to **MCP** section
-3. **Veilguard** should appear with a green status indicator
-
-Or ask Cascade: *"What Veilguard tools do you have access to?"* — it should list all 14 tools.
+This file tells Cascade exactly when to call each Veilguard tool. Without it, the tools still work but won't fire automatically.
 
 ---
 
-## Add your Pro key
+## Step 3 — Restart Windsurf
 
-If you have a Pro license, add your key to `~/.windsurf/mcp.json`:
+Close and reopen Windsurf completely.
+
+---
+
+## Verify
+
+1. Open the **Tools** panel → **MCP** section
+2. **Veilguard** should appear with a green status indicator
+
+Or ask Cascade: *"What Veilguard tools do you have access to?"*
+
+---
+
+## Pro key
+
+To activate Pro, add your license key to `~/.windsurf/mcp.json`:
 
 ```json
-{
-  "mcpServers": {
-    "veilguard": {
-      "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
-      "env": {
-        "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
-      }
-    }
-  }
+"env": {
+  "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
 }
 ```
 
-Restart Windsurf after saving.
-
----
-
-## How auto-scanning works in Windsurf
-
-The `.windsurfrules` file instructs Cascade to call Veilguard tools at specific moments:
-
-- After you write or modify any file → `scan_secrets`
-- After you create an API route → `scan_webhooks` + `scan_injection`
-- After you change a Supabase migration or SQL file → `check_supabase_rls`
-- After you modify `package.json` → `check_supply_chain` + `scan_dependencies`
-- When you say "deploy", "go live", "ship it" → `full_audit`
-
-Clean scans produce no output. Cascade stays silent unless something is found.
+Restart Windsurf after saving. Get a key at [veilguard.dev/pro](https://veilguard.dev/pro).
 
 ---
 
 ## Notes
 
-- The `~/.windsurf/mcp.json` config is **global** — it applies to every project you open in Windsurf
-- The `.windsurfrules` file is **project-level** — run `init` in each project you want protected
+- `~/.windsurf/mcp.json` is **global** — applies to every project you open in Windsurf
+- `.windsurfrules` is **project-level** — add it to each project you want protected
 - Node.js 18 or later is required
