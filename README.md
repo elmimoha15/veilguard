@@ -9,21 +9,20 @@ You never run a scan. You never read a report. You just vibe.
 ## Install
 
 ```bash
-npx @veilguard/cli init
+npx veilguard-cli init
 ```
 
 This auto-detects your IDE, installs security rules, and adds the MCP server config. Takes 30 seconds.
 
 ## IDE Support
 
-| IDE | Config |
-|-----|--------|
-| Claude Code | `claude mcp add veilguard -- npx -y @veilguard/cli` |
+| IDE | Config file |
+|-----|------------|
+| Claude Code | `claude mcp add veilguard -- npx -y --package=veilguard-cli veilguard-mcp` |
 | Cursor | `.cursor/mcp.json` |
 | Windsurf | `~/.windsurf/mcp.json` |
 | VS Code | `.vscode/mcp.json` |
-| JetBrains | Settings → Tools → MCP Server |
-| Antigravity | MCP Settings Panel |
+| Antigravity | `.gemini/mcp.json` |
 
 **MCP config (all IDEs):**
 
@@ -32,7 +31,7 @@ This auto-detects your IDE, installs security rules, and adds the MCP server con
   "mcpServers": {
     "veilguard": {
       "command": "npx",
-      "args": ["-y", "@veilguard/cli"],
+      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
       "env": {
         "VEILGUARD_KEY": ""
       }
@@ -105,6 +104,3 @@ MIT
 - [Website](https://veilguard.dev)
 - [Documentation](https://veilguard.dev/docs)
 - [Go Pro](https://veilguard.dev/pro)
-# veilguard
-# veilguard
-# veilguard

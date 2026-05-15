@@ -17,12 +17,20 @@ function getCommand(): string {
 /** Detect which IDEs are present in the current directory */
 function detectIDEs(dir: string): string[] {
   const ides: string[] = [];
+
+  // Project-level checks — most specific, checked first
   if (existsSync(join(dir, '.cursor'))) ides.push('cursor');
   if (existsSync(join(dir, '.vscode'))) ides.push('vscode');
-  if (existsSync(join(dir, '.windsurf')) || existsSync(join(homedir(), '.windsurf'))) ides.push('windsurf');
+  if (existsSync(join(dir, '.windsurf'))) ides.push('windsurf');
   if (existsSync(join(dir, '.claude')) || existsSync(join(dir, 'CLAUDE.md'))) ides.push('claude');
-  if (existsSync(join(dir, '.idea'))) ides.push('jetbrains');
   if (existsSync(join(dir, '.gemini'))) ides.push('antigravity');
+
+  // Global Windsurf install (~/.windsurf) — only used as a fallback so it
+  // doesn't fire when the user is working in Cursor / VS Code / etc.
+  if (ides.length === 0 && existsSync(join(homedir(), '.windsurf'))) {
+    ides.push('windsurf');
+  }
+
   return ides;
 }
 
@@ -126,10 +134,6 @@ function init(): void {
         process.stdout.write('    Created: .claude/hooks.json\n');
         break;
       }
-      case 'jetbrains':
-        process.stdout.write('  ✓ JetBrains: Add manually in Settings → Tools → MCP Server\n');
-        process.stdout.write('    Command: npx  Args: -y @veilguard/cli\n');
-        break;
       case 'antigravity':
         copyTemplate('antigravityrules.txt', join(dir, '.antigravityrules'), true);
         addMcpConfig(join(dir, '.gemini', 'mcp.json'));
