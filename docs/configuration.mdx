@@ -11,7 +11,7 @@ Every IDE uses the same JSON block — only the file path differs:
   "mcpServers": {
     "veilguard": {
       "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "args": ["-y", "--package=veilguard", "veilguard-mcp"],
       "env": {
         "VEILGUARD_KEY": ""
       }
@@ -44,7 +44,7 @@ If you're on the free tier, leave `VEILGUARD_KEY` empty (or remove the `env` blo
   "mcpServers": {
     "veilguard": {
       "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "args": ["-y", "--package=veilguard", "veilguard-mcp"],
       "env": {
         "VEILGUARD_KEY": "vg_live_xxxxxxxxxxxxxxxxxxxx"
       }

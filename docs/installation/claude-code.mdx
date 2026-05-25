@@ -9,7 +9,7 @@ Claude Code gets the most complete Veilguard integration — MCP tools, a rules 
 Run this in your terminal:
 
 ```bash
-claude mcp add veilguard -- npx -y --package=veilguard-cli veilguard-mcp
+claude mcp add veilguard -- npx -y --package=veilguard veilguard-mcp
 ```
 
 **Alternative:** Create `.claude/mcp.json` in your project root:
@@ -19,7 +19,7 @@ claude mcp add veilguard -- npx -y --package=veilguard-cli veilguard-mcp
   "mcpServers": {
     "veilguard": {
       "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "args": ["-y", "--package=veilguard", "veilguard-mcp"],
       "env": {
         "VEILGUARD_KEY": ""
       }
@@ -48,13 +48,13 @@ Create `.claude/hooks.json` in your project:
     "postSave": [
       {
         "pattern": "**/*.{ts,tsx,js,jsx,json,sql,env,toml,yaml,yml}",
-        "command": "npx veilguard-cli quick-scan --file $FILE",
+        "command": "npx veilguard quick-scan --file $FILE",
         "description": "Veilguard: scan saved file for security issues"
       }
     ],
     "preDeploy": [
       {
-        "command": "npx veilguard-cli quick-scan --dir .",
+        "command": "npx veilguard quick-scan --dir .",
         "description": "Veilguard: pre-deploy security check"
       }
     ]
@@ -87,7 +87,7 @@ You should see `veilguard` in the output. Or ask Claude: *"What Veilguard tools 
 To activate Pro, add your license key:
 
 ```bash
-claude mcp add veilguard --env VEILGUARD_KEY=vg_live_xxxxxxxxxxxxxxxxxxxx -- npx -y --package=veilguard-cli veilguard-mcp
+claude mcp add veilguard --env VEILGUARD_KEY=vg_live_xxxxxxxxxxxxxxxxxxxx -- npx -y --package=veilguard veilguard-mcp
 ```
 
 Or add it to the `env` block in `.claude/mcp.json`. Get a key at [veilguard.dev/pro](https://veilguard.dev/pro).

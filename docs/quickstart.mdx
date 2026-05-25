@@ -23,7 +23,7 @@ Copy this JSON and paste it into your IDE's MCP settings:
   "mcpServers": {
     "veilguard": {
       "command": "npx",
-      "args": ["-y", "--package=veilguard-cli", "veilguard-mcp"],
+      "args": ["-y", "--package=veilguard", "veilguard-mcp"],
       "env": {
         "VEILGUARD_KEY": ""
       }
@@ -39,7 +39,7 @@ Copy this JSON and paste it into your IDE's MCP settings:
 | **Cursor** | Create `.cursor/mcp.json` in your project folder |
 | **Windsurf** | Add to `~/.windsurf/mcp.json` (global config) |
 | **VS Code** | Open Settings → search "MCP" → Edit in settings.json |
-| **Claude Code** | Run: `claude mcp add veilguard -- npx -y --package=veilguard-cli veilguard-mcp` |
+| **Claude Code** | Run: `claude mcp add veilguard -- npx -y --package=veilguard veilguard-mcp` |
 | **Antigravity** | Create `.gemini/mcp.json` in your project folder |
 
 For detailed step-by-step instructions, see the per-IDE guides:
