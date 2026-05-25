@@ -10,7 +10,6 @@ import type { Finding, ScanResult, SecretPattern, Tier } from '../types.js';
 
 let patternsCache: SecretPattern[] | null = null;
 
-/** Load secret patterns from patterns/secrets.json */
 async function loadPatterns(): Promise<SecretPattern[]> {
   if (patternsCache) return patternsCache;
 
@@ -25,19 +24,16 @@ async function loadPatterns(): Promise<SecretPattern[]> {
   }
 }
 
-/** Mask a secret value — show first 8 chars + ... */
 function maskSecret(value: string): string {
   if (value.length <= 12) return value.substring(0, 4) + '...';
   return value.substring(0, 8) + '...';
 }
 
-/** Check if file is in a .env file (secrets there are expected) */
 function isEnvFile(filePath: string): boolean {
   const name = filePath.split('/').pop() || '';
   return name.startsWith('.env');
 }
 
-/** Scan a single file for secret patterns */
 async function scanFile(
   filePath: string,
   patterns: SecretPattern[],
@@ -100,7 +96,6 @@ async function scanFile(
   return findings;
 }
 
-/** Run the secret scanner on a directory */
 export async function scanSecrets(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const patterns = await loadPatterns();
@@ -132,7 +127,6 @@ export async function scanSecrets(directory: string, _tier: Tier): Promise<ScanR
   };
 }
 
-/** Format scan results with tier-aware depth limiting */
 export function formatSecretResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
 

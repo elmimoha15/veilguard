@@ -15,19 +15,14 @@ import { analyzeRls, formatRlsResults } from './scanners/rls-analyzer.js';
 import { analyzeFirebase, formatFirebaseResults } from './scanners/firebase-analyzer.js';
 import { scanAppSecurity, formatAppSecurityResults } from './scanners/app-security-scanner.js';
 import { runFullAudit, runAllScanners, formatAuditReport, formatLockedAuditReport } from './scanners/full-audit.js';
-import { logger } from './utils/logger.js';
 
-/** Create and configure the Veilguard MCP server */
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'veilguard',
-    version: '0.1.0',
+    version: '0.1.9',
   });
 
-  // ─── SCANNER TOOLS (all free, full results for everyone) ──
-  // Every scanner runs with tier='pro' so all findings, fix
-  // suggestions and breach context are always shown. No caps,
-  // no upgrade prompts, no upsell except inside full_audit.
+  // all scanners run at pro depth — only full_audit is gated
   const TIER = 'pro' as const;
 
   server.tool(
@@ -160,10 +155,6 @@ export function createServer(): McpServer {
     },
   );
 
-  // ─── FULL AUDIT (only gated tool) ─────────────────────────
-  // Pro: full grade + AI-ready fix prompt, capped at 3/month.
-  // Free / no key: runs the same scans, shows the plain-English
-  // findings, but locks the grade behind the upsell message.
   server.tool(
     'full_audit',
     'Run all 13 security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Requires VEILGUARD_KEY for the grade; free users see findings with a locked grade.',
@@ -184,6 +175,5 @@ export function createServer(): McpServer {
     },
   );
 
-  logger.info('Veilguard MCP server initialized with 14 tools (13 unrestricted + full_audit)');
   return server;
 }

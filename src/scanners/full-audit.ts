@@ -15,11 +15,6 @@ import { checkAuditLimit, incrementAuditUsage } from '../license/license.js';
 import { logger } from '../utils/logger.js';
 import type { AuditReport, ScanResult, Tier } from '../types.js';
 
-/**
- * Run every scanner once and build a full AuditReport.
- * This is the un-gated workhorse: it does NOT check or increment audit limits.
- * Used by both the Pro full audit and the locked free-tier preview.
- */
 export async function runAllScanners(directory: string, tier: Tier): Promise<AuditReport> {
   const start = Date.now();
   logger.info('Running all security scanners...');
@@ -69,7 +64,6 @@ export async function runAllScanners(directory: string, tier: Tier): Promise<Aud
   return report;
 }
 
-/** Run the full security audit (PRO, 3/month). Enforces the monthly limit. */
 export async function runFullAudit(directory: string, tier: Tier): Promise<AuditReport | string> {
   const limitCheck = await checkAuditLimit();
   if (!limitCheck.allowed) {
@@ -81,24 +75,9 @@ export async function runFullAudit(directory: string, tier: Tier): Promise<Audit
   return report;
 }
 
-/* -----------------------------------------------------------
- * Plain-English translation for the audit report
- * --------------------------------------------------------- */
-
-/** Divider used between every section of the audit output. */
 const DIVIDER = '─────────────────────────────';
 
-/**
- * Plain-English consequence for a single finding. The end user is a
- * non-technical "vibe coder", so we describe what will actually happen
- * to them if the issue is not fixed — never the scanner name or jargon.
- *
- * Resolution order:
- *  1. Finding id  → most specific
- *  2. Finding category
- *  3. Owning scanner (passed in by caller)
- *  4. Fallback to the finding's own title
- */
+// plain-English consequences keyed by finding id, then category, then scanner
 const ID_CONSEQUENCES: Record<string, string> = {
   // IDOR
   'injection-idor-params-id':
@@ -187,7 +166,6 @@ const SCANNER_CONSEQUENCES: Record<string, string> = {
   scan_app_security: 'Your application logic has security gaps that attackers commonly exploit',
 };
 
-/** Plain-English label for each scanner used in the "What passed" section. */
 const SCANNER_PASSED_LABEL: Record<string, string> = {
   scan_secrets: 'No hardcoded API keys or secrets found in your source code',
   check_env: 'Environment variables are properly configured',
@@ -270,10 +248,6 @@ function buildPassedSection(report: AuditReport): string[] {
   return passed;
 }
 
-/**
- * Pro full audit output — sectioned report with grade, findings, grade-meaning,
- * AI fix prompt and a "what passed" celebration list.
- */
 export function formatAuditReport(report: AuditReport): string {
   const criticals = collectRendered(report, 'critical');
   const warnings = collectRendered(report, 'warning');
@@ -347,10 +321,6 @@ export function formatAuditReport(report: AuditReport): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
-/**
- * Free-tier output: same plain-English findings (including file + fix) but the
- * grade is hidden behind the locked-grade upsell.
- */
 export function formatLockedAuditReport(report: AuditReport): string {
   const criticals = collectRendered(report, 'critical');
   const warnings = collectRendered(report, 'warning');

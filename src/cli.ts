@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { scanSecrets } from './scanners/secret-scanner.js';
 import { checkEnv } from './scanners/env-checker.js';
 import { scanInjection } from './scanners/injection-scanner.js';
@@ -8,7 +7,6 @@ function getCommand(): string {
   return process.argv[2] || 'start';
 }
 
-/** Quick scan for Claude Code hooks (fast, single file or directory) */
 async function quickScan(): Promise<void> {
   const fileArg = process.argv.indexOf('--file');
   const dirArg = process.argv.indexOf('--dir');
@@ -42,8 +40,6 @@ async function quickScan(): Promise<void> {
   }
   // If clean: total silence (no output)
 }
-
-// ─── Main CLI Router ────────────────────────────────────────
 
 const command = getCommand();
 

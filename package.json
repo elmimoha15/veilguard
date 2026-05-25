@@ -1,11 +1,11 @@
 {
   "name": "veilguard",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "description": "Silent MCP security scanner for vibe coders",
   "type": "module",
   "bin": {
-    "veilguard-cli": "./dist/cli.js",
-    "veilguard-mcp": "./dist/index.js"
+    "veilguard-cli": "dist/cli.js",
+    "veilguard-mcp": "dist/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -44,7 +44,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/elmimoha15/veilguard"
+    "url": "git+https://github.com/elmimoha15/veilguard.git"
   },
   "homepage": "https://veilguard.dev",
   "dependencies": {

@@ -3,10 +3,6 @@ import { join, relative, extname } from 'path';
 import { SKIP_DIRS, CODE_EXTENSIONS } from './constants.js';
 import { logger } from './logger.js';
 
-/**
- * Parses a .gitignore file and returns a set of ignored paths/patterns.
- * Simple implementation covering common patterns.
- */
 async function loadGitignore(rootDir: string): Promise<Set<string>> {
   const ignored = new Set<string>();
   try {
@@ -44,10 +40,6 @@ function shouldIncludeFile(
   return allowedExts.includes(ext);
 }
 
-/**
- * Walks a directory recursively and returns all matching file paths.
- * Respects .gitignore, skips node_modules/dist/.next/etc.
- */
 export async function scanDirectory(
   rootDir: string,
   extensions?: string[],

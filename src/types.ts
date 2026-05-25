@@ -1,10 +1,6 @@
-/** Severity levels for security findings */
 export type Severity = 'critical' | 'warning' | 'info' | 'passed';
-
-/** License tier */
 export type Tier = 'free' | 'pro';
 
-/** A single security finding */
 export interface Finding {
   id: string;
   severity: Severity;
@@ -19,7 +15,6 @@ export interface Finding {
   breach_precedent?: string;
 }
 
-/** Result from a single scanner */
 export interface ScanResult {
   scanner: string;
   timestamp: string;
@@ -27,7 +22,6 @@ export interface ScanResult {
   findings: Finding[];
 }
 
-/** Full audit report with scoring */
 export interface AuditReport {
   score: number;
   grade: string;
@@ -42,7 +36,6 @@ export interface AuditReport {
   fix_prompt: string;
 }
 
-/** Secret pattern definition (loaded from patterns/secrets.json) */
 export interface SecretPattern {
   id: string;
   name: string;
@@ -53,7 +46,6 @@ export interface SecretPattern {
   context_required?: string;
 }
 
-/** Webhook verification rule */
 export interface WebhookRule {
   provider: string;
   endpoint_patterns: string[];
@@ -63,7 +55,6 @@ export interface WebhookRule {
   breach_precedent?: string;
 }
 
-/** Injection detection pattern */
 export interface InjectionPattern {
   id: string;
   name: string;
@@ -74,7 +65,6 @@ export interface InjectionPattern {
   breach_precedent?: string;
 }
 
-/** RLS rule definition */
 export interface RlsRule {
   id: string;
   name: string;
@@ -84,7 +74,6 @@ export interface RlsRule {
   breach_precedent?: string;
 }
 
-/** Firebase rule definition */
 export interface FirebaseRule {
   id: string;
   name: string;
@@ -93,20 +82,17 @@ export interface FirebaseRule {
   fix: string;
 }
 
-/** Malicious package entry */
 export interface MaliciousPackageEntry {
   name: string;
   reason: string;
 }
 
-/** Malicious packages database */
 export interface MaliciousPackagesDB {
   known_malicious: MaliciousPackageEntry[];
   typosquats: Record<string, string[]>;
   suspicious_patterns: string[];
 }
 
-/** License validation result */
 export interface LicenseResult {
   tier: Tier;
   valid: boolean;
@@ -114,16 +100,13 @@ export interface LicenseResult {
   expires_at?: string;
 }
 
-/** Audit usage tracking */
 export interface AuditUsage {
   count: number;
   reset_date: string;
 }
 
-/** Scanner registration function signature */
 export type ScannerFn = (directory: string, tier: Tier) => Promise<ScanResult>;
 
-/** Tool registration info */
 export interface ToolRegistration {
   name: string;
   description: string;

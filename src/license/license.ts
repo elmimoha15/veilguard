@@ -11,7 +11,6 @@ import { fetchSafe } from '../utils/http.js';
 import { logger } from '../utils/logger.js';
 import type { LicenseResult, AuditUsage, Tier } from '../types.js';
 
-/** Ensure the ~/.veilguard directory exists */
 async function ensureDir(): Promise<void> {
   try {
     await mkdir(VEILGUARD_HOME, { recursive: true });
@@ -20,7 +19,6 @@ async function ensureDir(): Promise<void> {
   }
 }
 
-/** Read cached license result */
 async function readCache(): Promise<LicenseResult | null> {
   try {
     const raw = await readFile(LICENSE_CACHE_PATH, 'utf-8');
@@ -35,23 +33,15 @@ async function readCache(): Promise<LicenseResult | null> {
   }
 }
 
-/** Write license result to cache */
 async function writeCache(result: LicenseResult): Promise<void> {
   await ensureDir();
   const data = { ...result, timestamp: Date.now() };
   await writeFile(LICENSE_CACHE_PATH, JSON.stringify(data, null, 2));
 }
 
-/**
- * Validate the license key. Checks cache first, then calls the API.
- * Returns 'free' tier if anything goes wrong (never blocks the user).
- */
+// Never throws — falls back to free tier if validation fails
 export async function validateLicense(): Promise<LicenseResult> {
   const key = process.env.VEILGUARD_KEY;
-
-  if (key === 'VEILGUARD-DEV-MASTER-KEY') {
-    return { tier: 'pro', valid: true, cached: false };
-  }
 
   if (!key || key.trim() === '' || key === 'your_key_here') {
     return { tier: 'free', valid: false, cached: false };
@@ -94,7 +84,6 @@ export async function validateLicense(): Promise<LicenseResult> {
   }
 }
 
-/** Read current audit usage */
 async function readAuditUsage(): Promise<AuditUsage> {
   try {
     const raw = await readFile(AUDIT_USAGE_PATH, 'utf-8');
@@ -111,17 +100,12 @@ async function readAuditUsage(): Promise<AuditUsage> {
   }
 }
 
-/** Get the 1st of next month as reset date */
 function getNextResetDate(): string {
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   return next.toISOString();
 }
 
-/**
- * Check if a full audit can be run (under the 3/month limit).
- * Returns { allowed: true } or { allowed: false, message: string }.
- */
 export async function checkAuditLimit(): Promise<{ allowed: boolean; message?: string }> {
   const usage = await readAuditUsage();
 
@@ -147,7 +131,6 @@ export async function checkAuditLimit(): Promise<{ allowed: boolean; message?: s
   return { allowed: true };
 }
 
-/** Increment the audit counter after a successful full audit */
 export async function incrementAuditUsage(): Promise<void> {
   await ensureDir();
   const usage = await readAuditUsage();
@@ -155,7 +138,6 @@ export async function incrementAuditUsage(): Promise<void> {
   await writeFile(AUDIT_USAGE_PATH, JSON.stringify(usage, null, 2));
 }
 
-/** Generate the upgrade message for free users */
 export function getUpgradeMessage(hiddenCount: number): string {
   return [
     `~~ veilguard ~~ ${hiddenCount} more issue${hiddenCount > 1 ? 's' : ''} found`,
@@ -178,7 +160,6 @@ export function getUpgradeMessage(hiddenCount: number): string {
   ].join('\n');
 }
 
-/** Generate the Pro-only tool message */
 export function getProOnlyMessage(toolName: string): string {
   return [
     '~~ veilguard ~~ Pro feature',

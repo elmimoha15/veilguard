@@ -13,6 +13,7 @@ export default defineConfig({
   splitting: true,
   sourcemap: true,
   shims: false,
+  banner: { js: '#!/usr/bin/env node' },
   external: [
     '@modelcontextprotocol/sdk',
   ],

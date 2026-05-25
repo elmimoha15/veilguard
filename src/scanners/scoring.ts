@@ -1,22 +1,14 @@
 import type { Finding, ScanResult } from '../types.js';
 
-/**
- * Per-finding score impact, weighted by real-world impact.
- * Matched in priority order — first matching rule wins.
- * Falls back to severity-based defaults if nothing matches.
- */
 interface ScoreRule {
   match: (f: Finding) => boolean;
   penalty: number;
 }
 
 const SCORE_RULES: ScoreRule[] = [
-  // ── Critical, high-impact ─────────────────────────────────
-  // Hardcoded secrets / fallback trap keys
   { match: (f) => f.category === 'secret' || f.id.startsWith('secret-'), penalty: 20 },
-  // Missing webhook signature verification
   { match: (f) => f.category === 'webhook' || f.id.startsWith('webhook-'), penalty: 20 },
-  // SQL / NoSQL / command injection (everything in the injection scanner except XSS+IDOR+mass-assign)
+  // SQL/NoSQL/command injection (not IDOR or mass-assign — those have separate rules below)
   {
     match: (f) =>
       (f.id.startsWith('injection-sql') ||
@@ -70,7 +62,6 @@ const SCORE_RULES: ScoreRule[] = [
   { match: (f) => f.category === 'headers' || f.id.startsWith('header-'), penalty: 5 },
 ];
 
-/** Calculate security score from findings, weighted by real-world impact. */
 export function calculateScore(findings: Finding[]): { score: number; grade: string } {
   let score = 100;
 
@@ -95,7 +86,6 @@ export function calculateScore(findings: Finding[]): { score: number; grade: str
   return { score, grade };
 }
 
-/** Plain-English explanation for what each grade means to a vibe coder. */
 export function gradeMeaning(grade: string): string {
   switch (grade) {
     case 'A+':
@@ -126,7 +116,6 @@ function scoreToGrade(score: number): string {
   return 'F';
 }
 
-/** Summarize findings by severity */
 export function summarizeFindings(findings: Finding[]): {
   critical: number;
   warning: number;
@@ -141,7 +130,6 @@ export function summarizeFindings(findings: Finding[]): {
   };
 }
 
-/** Generate AI-ready fix prompt from all findings */
 export function generateFixPrompt(scans: ScanResult[]): string {
   const allFindings = scans.flatMap((s) => s.findings).filter((f) => f.severity === 'critical' || f.severity === 'warning');
 

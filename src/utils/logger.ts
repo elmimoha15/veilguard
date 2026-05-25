@@ -18,7 +18,6 @@ function formatMessage(level: LogLevel, message: string): string {
   return `[veilguard] ${timestamp} ${level.toUpperCase()} ${message}`;
 }
 
-/** Structured logger prefixed with [veilguard] */
 export const logger = {
   debug(message: string): void {
     if (shouldLog('debug')) {
