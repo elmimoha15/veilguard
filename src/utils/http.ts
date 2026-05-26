@@ -8,10 +8,7 @@ interface FetchOptions {
   timeoutMs?: number;
 }
 
-/**
- * Fetch wrapper with timeout and single retry.
- * Returns null on failure (never throws).
- */
+// returns null on failure, never throws
 export async function fetchSafe<T>(
   url: string,
   options: FetchOptions = {},

@@ -35,7 +35,6 @@ function searchGitHistory(directory: string, pattern: string): boolean {
   }
 }
 
-/** Run git security checks */
 export async function checkGit(directory: string, tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];

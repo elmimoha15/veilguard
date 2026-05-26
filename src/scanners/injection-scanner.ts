@@ -63,7 +63,6 @@ async function scanFileForInjection(
   return findings;
 }
 
-/** Run the injection scanner */
 export async function scanInjection(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const rules = await loadRules();

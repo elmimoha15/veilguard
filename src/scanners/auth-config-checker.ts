@@ -3,7 +3,6 @@ import { readFileSafe } from '../utils/file-reader.js';
 import { logger } from '../utils/logger.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
-/** Detect which auth provider is used */
 async function detectAuthProvider(directory: string): Promise<string | null> {
   const files = await scanDirectory(directory, ['.ts', '.tsx', '.js', '.jsx', '.json']);
   for (const file of files) {
@@ -17,7 +16,93 @@ async function detectAuthProvider(directory: string): Promise<string | null> {
   return null;
 }
 
-/** Check for common auth misconfigurations */
+function checkPasswordResetSecurity(filePath: string, content: string): Finding[] {
+  const findings: Finding[] = [];
+  const lines = content.split('\n');
+  
+  // Only check files that look like password reset handlers
+  if (!/reset|forgot|password/i.test(filePath) && !/reset|forgot/i.test(content)) {
+    return findings;
+  }
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Check for Math.random() used for token generation (insecure)
+    if (/Math\.random\s*\(\s*\)/.test(line) && /token|reset|password/i.test(content)) {
+      findings.push({
+        id: 'auth-weak-reset-token',
+        severity: 'critical',
+        category: 'auth',
+        title: 'Weak password reset token (Math.random)',
+        message: `Your password reset flow uses Math.random() at ${filePath}:${i + 1}. This is predictable and attackers can guess reset tokens. Use crypto.randomBytes() instead.`,
+        file: filePath,
+        line: i + 1,
+        fix: "Use crypto.randomBytes(32).toString('hex') for secure token generation.",
+        cwe: 'CWE-330',
+        breach_precedent: 'Predictable reset tokens allow account takeover by guessing the token.',
+      });
+    }
+    
+    // Check for token in URL without expiry validation
+    if (/req\.(query|params)\.token/.test(line) && !/expir|valid|timestamp|createdAt/i.test(content)) {
+      findings.push({
+        id: 'auth-reset-token-no-expiry',
+        severity: 'warning',
+        category: 'auth',
+        title: 'Password reset token without expiry check',
+        message: `Password reset token read from URL at ${filePath}:${i + 1} but no expiry validation found. Old tokens should expire after 1 hour.`,
+        file: filePath,
+        line: i + 1,
+        fix: 'Store token creation time and reject tokens older than 1 hour. Also invalidate after use.',
+        cwe: 'CWE-640',
+      });
+    }
+  }
+  
+  // Check for missing rate limiting on reset endpoint
+  if (/\/reset|\/forgot|password-reset|forgot-password/i.test(content)) {
+    if (!/rateLimit|rate-limit|rateLimiter/i.test(content)) {
+      for (let i = 0; i < lines.length; i++) {
+        if (/\.(post|get|all)\s*\(\s*['"`].*reset|forgot/i.test(lines[i])) {
+          findings.push({
+            id: 'auth-reset-no-rate-limit',
+            severity: 'warning',
+            category: 'auth',
+            title: 'No rate limiting on password reset',
+            message: `Password reset endpoint at ${filePath}:${i + 1} has no rate limiting. Attackers can spam reset emails to harass users or enumerate accounts.`,
+            file: filePath,
+            line: i + 1,
+            fix: 'Add rate limiting: max 3 reset requests per email per hour.',
+            cwe: 'CWE-307',
+          });
+          break;
+        }
+      }
+    }
+  }
+  
+  // Check for token reuse (no invalidation after use)
+  if (/token/.test(content) && /reset|password/i.test(content)) {
+    // If we see token validation but no deletion/invalidation
+    if (/findOne|findUnique|where.*token/i.test(content) && 
+        !/delete|remove|invalidate|used\s*=\s*true|update.*used/i.test(content)) {
+      findings.push({
+        id: 'auth-reset-token-reuse',
+        severity: 'warning',
+        category: 'auth',
+        title: 'Password reset token may be reusable',
+        message: `Password reset flow in ${filePath} validates tokens but may not invalidate them after use. Tokens should be single-use.`,
+        file: filePath,
+        fix: 'Delete or mark the token as used immediately after successful password reset.',
+        cwe: 'CWE-640',
+      });
+    }
+  }
+  
+  return findings;
+}
+
 async function checkAuthPatterns(directory: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const files = await scanDirectory(directory, ['.ts', '.tsx', '.js', '.jsx']);
@@ -26,6 +111,9 @@ async function checkAuthPatterns(directory: string): Promise<Finding[]> {
     const content = await readFileSafe(file);
     if (!content) continue;
     const lines = content.split('\n');
+    
+    // Check password reset security (GAP 6)
+    findings.push(...checkPasswordResetSecurity(file, content));
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -85,7 +173,6 @@ async function checkAuthPatterns(directory: string): Promise<Finding[]> {
   return findings;
 }
 
-/** Run the auth config checker */
 export async function checkAuthConfig(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const provider = await detectAuthProvider(directory);

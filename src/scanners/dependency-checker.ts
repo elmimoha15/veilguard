@@ -17,7 +17,6 @@ interface OsvResponse {
   vulns?: OsvVuln[];
 }
 
-/** Query OSV.dev for vulnerabilities in a package */
 async function queryOsv(packageName: string, version: string): Promise<OsvVuln[]> {
   const response = await fetchSafe<OsvResponse>(OSV_API_URL, {
     method: 'POST',
@@ -31,7 +30,6 @@ async function queryOsv(packageName: string, version: string): Promise<OsvVuln[]
   return response?.vulns ?? [];
 }
 
-/** Extract fix version from OSV vulnerability data */
 function getFixVersion(vuln: OsvVuln): string | null {
   const affected = vuln.affected?.[0];
   const ranges = affected?.ranges?.[0];
@@ -39,7 +37,6 @@ function getFixVersion(vuln: OsvVuln): string | null {
   return fixEvent?.fixed ?? null;
 }
 
-/** Get severity from OSV data */
 function getSeverity(vuln: OsvVuln): 'critical' | 'warning' | 'info' {
   const score = vuln.severity?.[0]?.score;
   if (!score) return 'warning';
@@ -50,12 +47,10 @@ function getSeverity(vuln: OsvVuln): 'critical' | 'warning' | 'info' {
   return 'info';
 }
 
-/** Clean version string (remove ^ ~ >= etc.) */
 function cleanVersion(version: string): string {
   return version.replace(/^[\^~>=<]+/, '').split(' ')[0];
 }
 
-/** Run the dependency checker */
 export async function scanDependencies(directory: string, tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];

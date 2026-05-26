@@ -5,7 +5,6 @@ import { readFileSafe } from '../utils/file-reader.js';
 import { scanDirectory } from '../utils/glob-scanner.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
-/** Check if a file exists */
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -15,7 +14,6 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-/** Check if .gitignore contains a pattern */
 async function gitignoreContains(rootDir: string, pattern: string): Promise<boolean> {
   try {
     const content = await readFile(join(rootDir, '.gitignore'), 'utf-8');
@@ -25,7 +23,6 @@ async function gitignoreContains(rootDir: string, pattern: string): Promise<bool
   }
 }
 
-/** Check if a file is tracked by git */
 function isTrackedByGit(rootDir: string, fileName: string): boolean {
   try {
     const result = execSync(`git ls-files ${fileName}`, { cwd: rootDir, encoding: 'utf-8' });
@@ -35,7 +32,6 @@ function isTrackedByGit(rootDir: string, fileName: string): boolean {
   }
 }
 
-/** Scan for NEXT_PUBLIC_ vars containing secrets */
 async function checkNextPublicVars(directory: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const files = await scanDirectory(directory, ['.ts', '.tsx', '.js', '.jsx', '.env']);
@@ -77,7 +73,6 @@ async function checkNextPublicVars(directory: string): Promise<Finding[]> {
   return findings;
 }
 
-/** Run the environment checker */
 export async function checkEnv(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];
@@ -143,7 +138,6 @@ export async function checkEnv(directory: string, _tier: Tier): Promise<ScanResu
   };
 }
 
-/** Format env check results */
 export function formatEnvResults(result: ScanResult, _tier: Tier): string {
   const { findings } = result;
 

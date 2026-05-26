@@ -3,7 +3,6 @@ import { readFileSafe, readJsonFile } from '../utils/file-reader.js';
 import { scanDirectory } from '../utils/glob-scanner.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
-/** Find the Firebase rules file path */
 async function findRulesFile(directory: string): Promise<string | null> {
   // Check firebase.json for rules path
   const firebaseConfig = await readJsonFile<{ firestore?: { rules?: string }; database?: { rules?: string } }>(
@@ -31,7 +30,6 @@ async function findRulesFile(directory: string): Promise<string | null> {
   return null;
 }
 
-/** Analyze Firebase rules content */
 function analyzeRules(content: string, filePath: string): Finding[] {
   const findings: Finding[] = [];
   const lines = content.split('\n');
@@ -88,7 +86,6 @@ function analyzeRules(content: string, filePath: string): Finding[] {
   return findings;
 }
 
-/** Run the Firebase analyzer (PRO) */
 export async function analyzeFirebase(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];

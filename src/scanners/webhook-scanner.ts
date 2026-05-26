@@ -23,7 +23,6 @@ async function loadRules(): Promise<WebhookRule[]> {
   }
 }
 
-/** Check if file content contains any of the required verification patterns (ignoring comments) */
 function hasVerification(content: string, required: string[]): boolean {
   // Strip single-line comments to avoid false positives
   const codeOnly = content
@@ -33,7 +32,58 @@ function hasVerification(content: string, required: string[]): boolean {
   return required.some((pattern) => codeOnly.includes(pattern));
 }
 
-/** Scan a file for webhook endpoints missing verification */
+function checkMissingFailureHandlers(filePath: string, content: string): Finding[] {
+  // Only check files that look like Stripe webhook handlers
+  if (!/stripe/i.test(content)) return [];
+  if (!/webhook/i.test(filePath) && !/webhook/i.test(content)) return [];
+  
+  const successEvents = [
+    'charge.succeeded',
+    'payment_intent.succeeded',
+    'checkout.session.completed',
+    'invoice.paid',
+    'invoice.payment_succeeded',
+  ];
+  
+  const failureEvents = [
+    'invoice.payment_failed',
+    'customer.subscription.deleted',
+    'charge.dispute.created',
+    'charge.failed',
+    'payment_intent.payment_failed',
+  ];
+  
+  const hasSuccessHandler = successEvents.some(event => content.includes(event));
+  const hasFailureHandler = failureEvents.some(event => content.includes(event));
+  
+  if (hasSuccessHandler && !hasFailureHandler) {
+    // Find the line with the success handler for better error location
+    const lines = content.split('\n');
+    let lineNum = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (successEvents.some(event => lines[i].includes(event))) {
+        lineNum = i + 1;
+        break;
+      }
+    }
+    
+    return [{
+      id: 'webhook-missing-failure-handler',
+      severity: 'critical',
+      category: 'webhook',
+      title: 'Missing payment failure handlers',
+      message: `Your app unlocks access when payment succeeds but never locks it again when payment fails or a subscription is cancelled. Users can keep your product for free after their card is declined or they cancel. This is an ongoing silent revenue leak. Found in ${filePath}:${lineNum}`,
+      file: filePath,
+      line: lineNum,
+      fix: 'Add handlers for invoice.payment_failed, customer.subscription.deleted, and charge.dispute.created to revoke access when payments fail.',
+      cwe: 'CWE-840',
+      breach_precedent: 'Silent revenue leak: SaaS apps lose thousands monthly when cancelled users retain access.',
+    }];
+  }
+  
+  return [];
+}
+
 async function scanFileForWebhooks(
   filePath: string,
   rules: WebhookRule[],
@@ -43,6 +93,9 @@ async function scanFileForWebhooks(
 
   const findings: Finding[] = [];
   const lines = content.split('\n');
+  
+  // Check for missing failure handlers (GAP 2)
+  findings.push(...checkMissingFailureHandlers(filePath, content));
 
   for (const rule of rules) {
     for (const endpointPattern of rule.endpoint_patterns) {
@@ -93,7 +146,6 @@ async function scanFileForWebhooks(
   return findings;
 }
 
-/** Run the webhook scanner */
 export async function scanWebhooks(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const rules = await loadRules();
@@ -113,7 +165,6 @@ export async function scanWebhooks(directory: string, _tier: Tier): Promise<Scan
   };
 }
 
-/** Format webhook results with tier-aware depth */
 export function formatWebhookResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
 

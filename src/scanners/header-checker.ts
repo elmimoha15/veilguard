@@ -53,7 +53,6 @@ const REQUIRED_HEADERS: HeaderCheck[] = [
   },
 ];
 
-/** Check security headers on a deployed URL */
 export async function checkHeaders(url: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];

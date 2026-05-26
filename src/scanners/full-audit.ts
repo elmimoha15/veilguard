@@ -10,6 +10,7 @@ import { scanDependencies } from './dependency-checker.js';
 import { analyzeRls } from './rls-analyzer.js';
 import { analyzeFirebase } from './firebase-analyzer.js';
 import { scanAppSecurity } from './app-security-scanner.js';
+import { scanRulesFiles } from './rules-file-scanner.js';
 import { calculateScore, summarizeFindings, generateFixPrompt, gradeMeaning } from './scoring.js';
 import { checkAuditLimit, incrementAuditUsage } from '../license/license.js';
 import { logger } from '../utils/logger.js';
@@ -34,6 +35,7 @@ export async function runAllScanners(directory: string, tier: Tier): Promise<Aud
     { name: 'rls', fn: () => analyzeRls(directory, tier) },
     { name: 'firebase', fn: () => analyzeFirebase(directory, tier) },
     { name: 'app-security', fn: () => scanAppSecurity(directory, tier) },
+    { name: 'rules-files', fn: () => scanRulesFiles(directory, tier) },
   ];
 
   for (const { name, fn } of scanners) {

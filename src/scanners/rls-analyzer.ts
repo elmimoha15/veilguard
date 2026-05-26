@@ -2,7 +2,6 @@ import { scanDirectory } from '../utils/glob-scanner.js';
 import { readFileSafe } from '../utils/file-reader.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
-/** Analyze SQL migration files for RLS issues */
 async function analyzeMigrations(directory: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const files = await scanDirectory(directory, ['.sql']);
@@ -95,7 +94,6 @@ async function analyzeMigrations(directory: string): Promise<Finding[]> {
   return findings;
 }
 
-/** Analyze source code for Supabase query patterns */
 async function analyzeSourceCode(directory: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const files = await scanDirectory(directory, ['.ts', '.tsx', '.js', '.jsx']);
@@ -148,7 +146,6 @@ async function analyzeSourceCode(directory: string): Promise<Finding[]> {
   return findings;
 }
 
-/** Run the RLS analyzer (PRO) */
 export async function analyzeRls(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const migrationFindings = await analyzeMigrations(directory);

@@ -2,12 +2,10 @@ import { scanDirectory } from '../utils/glob-scanner.js';
 import { readFileSafe } from '../utils/file-reader.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
-/** Check if the project has auth endpoints (context for CORS severity) */
 function hasAuthEndpoints(content: string): boolean {
   return /\/(login|signin|signup|auth|api\/)/i.test(content);
 }
 
-/** Run the CORS scanner */
 export async function checkCors(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];

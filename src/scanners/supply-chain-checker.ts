@@ -20,7 +20,6 @@ async function loadDB(): Promise<MaliciousPackagesDB> {
   }
 }
 
-/** Run the supply chain checker */
 export async function checkSupplyChain(directory: string, tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];

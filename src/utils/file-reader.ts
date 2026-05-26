@@ -2,10 +2,6 @@ import { readFile, stat } from 'fs/promises';
 import { MAX_FILE_SIZE } from './constants.js';
 import { logger } from './logger.js';
 
-/**
- * Safely reads a file's content. Returns null on any error.
- * Skips binary files and files exceeding MAX_FILE_SIZE.
- */
 export async function readFileSafe(filePath: string): Promise<string | null> {
   try {
     const fileStat = await stat(filePath);
@@ -33,9 +29,6 @@ export async function readFileSafe(filePath: string): Promise<string | null> {
   }
 }
 
-/**
- * Reads a JSON file and parses it. Returns null on error.
- */
 export async function readJsonFile<T>(filePath: string): Promise<T | null> {
   const content = await readFileSafe(filePath);
   if (content === null) return null;

@@ -6,6 +6,8 @@ interface ScoreRule {
 }
 
 const SCORE_RULES: ScoreRule[] = [
+  // Service role in frontend is the worst — instant database takeover (Moltbook attack)
+  { match: (f) => f.id === 'secret-service-role-frontend', penalty: 25 },
   { match: (f) => f.category === 'secret' || f.id.startsWith('secret-'), penalty: 20 },
   { match: (f) => f.category === 'webhook' || f.id.startsWith('webhook-'), penalty: 20 },
   // SQL/NoSQL/command injection (not IDOR or mass-assign — those have separate rules below)

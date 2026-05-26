@@ -14,12 +14,13 @@ import { scanDependencies, formatDependencyResults } from './scanners/dependency
 import { analyzeRls, formatRlsResults } from './scanners/rls-analyzer.js';
 import { analyzeFirebase, formatFirebaseResults } from './scanners/firebase-analyzer.js';
 import { scanAppSecurity, formatAppSecurityResults } from './scanners/app-security-scanner.js';
+import { scanRulesFiles, formatRulesFileResults } from './scanners/rules-file-scanner.js';
 import { runFullAudit, runAllScanners, formatAuditReport, formatLockedAuditReport } from './scanners/full-audit.js';
 
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'veilguard',
-    version: '0.1.9',
+    version: '0.2.0',
   });
 
   // all scanners run at pro depth — only full_audit is gated
@@ -156,8 +157,18 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    'scan_rules_files',
+    'Scan AI rules files (.cursorrules, .windsurfrules, CLAUDE.md, etc.) for hidden Unicode backdoors, base64 payloads, suspicious URLs, and malicious instructions.',
+    { directory: z.string().describe('Absolute path to the project root directory') },
+    async ({ directory }) => {
+      const result = await scanRulesFiles(directory, TIER);
+      return { content: [{ type: 'text', text: formatRulesFileResults(result, TIER) }] };
+    },
+  );
+
+  server.tool(
     'full_audit',
-    'Run all 13 security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Requires VEILGUARD_KEY for the grade; free users see findings with a locked grade.',
+    'Run all 14 security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Requires VEILGUARD_KEY for the grade; free users see findings with a locked grade.',
     { directory: z.string().describe('Absolute path to the project root directory') },
     async ({ directory }) => {
       const license = await validateLicense();

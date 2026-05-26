@@ -60,7 +60,10 @@ After modifying .env, .gitignore, next.config.js, vercel.json, or any config fil
 When the user says "deploy", "push", "ship", "go live", "launch", or "publish", ALWAYS run `full_audit` first (or if not Pro: run `scan_secrets`, `check_env`, `scan_webhooks`, `scan_injection`, `check_cors`, `check_supply_chain` in sequence). Share the results as a brief security summary. If there are critical findings, warn the user BEFORE deploying.
 
 ### On Project Start
-The FIRST time the user asks you to work on a project, run `scan_secrets` and `check_env` on the project root. Share results only if something is found.
+The FIRST time the user asks you to work on a project, run `scan_secrets`, `check_env`, and `scan_rules_files` on the project root. Share results only if something is found.
+
+### On Rules File Changes
+After creating or modifying .cursorrules, .windsurfrules, CLAUDE.md, .antigravityrules, or any .rules or .mcp.json file, call `scan_rules_files`. These files can contain hidden backdoors that steer AI to write malicious code.
 
 ### On Security / Audit Keywords (ALWAYS use the tool, never improvise)
 When the user says ANY of these phrases — or anything semantically equivalent that implies they want their whole project scanned, graded, or judged "safe to deploy" — you MUST immediately call the Veilguard `full_audit` MCP tool. Do not summarize security yourself. Do not think through it yourself. Do not produce your own checklist. The tool does the work; you just call it.
@@ -111,6 +114,7 @@ Every scanner result must be translated to its consequence sentence below. Use �
 - `scan_dependencies` failed → 🟡 One of your npm packages has a known security vulnerability
 - `check_supply_chain` failed → 🟡 A suspicious package in your project could be stealing data
 - `check_git` failed → 🟡 Sensitive files or secrets have been committed to your git history
+- `scan_rules_files` failed → 🔴 Your AI rules file may contain hidden backdoors that could steer your AI to write malicious code
 
 ### full_audit Output Format
 ALWAYS lead with the grade big and clear, then list ONLY the plain-English consequences. NEVER use scanner names or technical jargon in the summary.

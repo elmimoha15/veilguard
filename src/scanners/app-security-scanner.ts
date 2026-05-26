@@ -6,10 +6,6 @@ import { logger } from '../utils/logger.js';
 import { getPatternsDir } from '../utils/paths.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
-/**
- * Pattern shape used by patterns/auth-rules.json.
- * Same idea as InjectionPattern but augmented with an optional category.
- */
 interface AuthRule {
   id: string;
   name: string;
@@ -69,20 +65,10 @@ function fileMentionsRateLimit(content: string): boolean {
 const PAYMENT_ROUTE_REGEX =
   /\/(checkout|charge|payment|payments|pay|billing|subscribe|subscription|invoice|order|orders|stripe|paystack|flutterwave|mpesa|m-pesa)\b/i;
 
-/** Generic helpers used to keep noise down. */
 function isTestFile(filePath: string): boolean {
   return /\.(test|spec)\.(t|j)sx?$/.test(filePath) || filePath.includes('__tests__');
 }
 
-/* -----------------------------------------------------------
- * Individual heuristic checks
- * --------------------------------------------------------- */
-
-/**
- * 1. Rate limiting missing on auth / payment / generic POST routes.
- *    Auth endpoints are already covered by auth-config-checker; this scanner
- *    targets payment + generic POST routes that currently slip through.
- */
 function checkRateLimiting(filePath: string, content: string): Finding[] {
   if (!looksLikeRouteFile(filePath, content)) return [];
   if (fileMentionsRateLimit(content)) return [];
@@ -142,12 +128,6 @@ function checkRateLimiting(filePath: string, content: string): Finding[] {
   return findings;
 }
 
-/**
- * 2. IDOR — heuristics for handlers that read `req.params.id` and then use it
- *    inside a DB call without ever referencing the current user.
- *    Pattern-based IDOR detection also lives in injection-rules.json; this
- *    function adds a function-scope cross-reference check.
- */
 function checkIdorHandlerScope(filePath: string, content: string): Finding[] {
   if (!/req\.(params|query)\.(id|userId|orderId)/.test(content)) return [];
   if (!/(prisma|supabase|db|sequelize|mongoose|knex)/i.test(content)) return [];
@@ -181,10 +161,6 @@ function checkIdorHandlerScope(filePath: string, content: string): Finding[] {
   return [];
 }
 
-/**
- * 3. Password security — pattern-driven via auth-rules.json (handled below)
- *    plus heuristic for "if (password === ...)" comparing plain text.
- */
 function checkPlaintextPasswordCompare(filePath: string, content: string): Finding[] {
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -211,9 +187,6 @@ function checkPlaintextPasswordCompare(filePath: string, content: string): Findi
   return [];
 }
 
-/**
- * 4. File upload security — uploads with no mime/size limits, or stored in public/.
- */
 function checkFileUploads(filePath: string, content: string): Finding[] {
   const findings: Finding[] = [];
   if (!/multer|formidable|busboy|@vercel\/blob|next-connect|multipart/i.test(content)) return findings;
@@ -276,9 +249,6 @@ function checkFileUploads(filePath: string, content: string): Finding[] {
   return findings;
 }
 
-/**
- * 5. Error exposure — stack traces / verbose error objects returned to clients.
- */
 function checkErrorExposure(filePath: string, content: string): Finding[] {
   const lines = content.split('\n');
   const findings: Finding[] = [];
@@ -310,9 +280,6 @@ function checkErrorExposure(filePath: string, content: string): Finding[] {
   return findings;
 }
 
-/**
- * 6. Sensitive data logging — console.log of password / token / email / card data.
- */
 function checkSensitiveLogging(filePath: string, content: string): Finding[] {
   const lines = content.split('\n');
   const findings: Finding[] = [];
@@ -338,10 +305,49 @@ function checkSensitiveLogging(filePath: string, content: string): Finding[] {
   return findings;
 }
 
-/**
- * 7. Apply patterns/auth-rules.json against the file.
- *    Covers password storage, weak hashing, open redirects.
- */
+function checkOpenRedirects(filePath: string, content: string): Finding[] {
+  const findings: Finding[] = [];
+  const lines = content.split('\n');
+  
+  const openRedirectPatterns = [
+    // Express/Node.js patterns
+    { pattern: /res\.redirect\s*\(\s*req\.(query|body|params)\.(next|url|redirect|returnUrl|return_url|callback|goto|dest|destination|redir|continue)/i, name: 'res.redirect with user input' },
+    { pattern: /res\.redirect\s*\(\s*req\.(query|body|params)\[['"`](next|url|redirect|returnUrl|return_url|callback|goto|dest|destination|redir|continue)['"`]\]/i, name: 'res.redirect with user input' },
+    // Next.js patterns
+    { pattern: /router\.push\s*\(\s*searchParams\.get\s*\(\s*['"`](next|url|redirect|returnUrl|return_url|callback|goto|dest|destination|redir|continue)['"`]\s*\)/i, name: 'router.push with user input' },
+    { pattern: /redirect\s*\(\s*searchParams\.get\s*\(\s*['"`](next|url|redirect|returnUrl|return_url|callback|goto|dest|destination|redir|continue)['"`]\s*\)/i, name: 'redirect() with user input' },
+    // Browser patterns
+    { pattern: /window\.location\.(href|assign|replace)\s*=\s*searchParams\.get\s*\(/i, name: 'window.location with user input' },
+    { pattern: /window\.location\.(href|assign|replace)\s*=\s*.*\.(query|search|hash)/i, name: 'window.location with URL params' },
+    // Generic dangerous patterns
+    { pattern: /Location['"`]?\s*[,:]\s*req\.(query|body|params)\./i, name: 'Location header with user input' },
+  ];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    for (const { pattern } of openRedirectPatterns) {
+      if (pattern.test(line)) {
+        findings.push({
+          id: 'open-redirect',
+          severity: 'critical',
+          category: 'redirect',
+          title: 'Open redirect vulnerability',
+          message: `Your app redirects users to URLs they control at ${filePath}:${i + 1}. Attackers use this to send your users to phishing pages that look like your login screen, steal their credentials, then redirect back. This is how account takeover attacks start.`,
+          file: filePath,
+          line: i + 1,
+          fix: 'Validate redirect URLs against an allowlist of trusted domains, or only allow relative paths starting with /.',
+          cwe: 'CWE-601',
+          breach_precedent: 'Open redirects are used in OAuth phishing attacks to steal access tokens.',
+        });
+        return findings; // One per file
+      }
+    }
+  }
+  
+  return findings;
+}
+
 function applyAuthRules(filePath: string, content: string, rules: AuthRule[]): Finding[] {
   const lines = content.split('\n');
   const findings: Finding[] = [];
@@ -378,7 +384,6 @@ function applyAuthRules(filePath: string, content: string, rules: AuthRule[]): F
   return findings;
 }
 
-/** Run the app security scanner across a project. */
 export async function scanAppSecurity(directory: string, _tier: Tier): Promise<ScanResult> {
   const start = Date.now();
   const rules = await loadAuthRules();
@@ -397,6 +402,7 @@ export async function scanAppSecurity(directory: string, _tier: Tier): Promise<S
     findings.push(...checkFileUploads(file, content));
     findings.push(...checkErrorExposure(file, content));
     findings.push(...checkSensitiveLogging(file, content));
+    findings.push(...checkOpenRedirects(file, content));
     findings.push(...applyAuthRules(file, content, rules));
   }
 

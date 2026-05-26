@@ -2,10 +2,6 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
-/**
- * Get the path to the patterns/ directory.
- * Works whether running from src/ (dev) or dist/ (built with tsup).
- */
 export function getPatternsDir(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -27,9 +23,6 @@ export function getPatternsDir(): string {
   return join(__dirname, '..', 'patterns');
 }
 
-/**
- * Get the path to the templates/ directory.
- */
 export function getTemplatesDir(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
