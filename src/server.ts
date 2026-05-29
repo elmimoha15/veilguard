@@ -20,7 +20,7 @@ import { runFullAudit, runAllScanners, formatAuditReport, formatLockedAuditRepor
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'veilguard',
-    version: '0.2.0',
+    version: '0.3.0',
   });
 
   // all scanners run at pro depth — only full_audit is gated

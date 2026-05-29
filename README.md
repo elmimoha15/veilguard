@@ -20,9 +20,17 @@ You never run a scan. You never read a report. You just code.
 
 ## Quick Start
 
-Add Veilguard to your IDE in two steps:
+### Option A — One command (recommended)
 
-### 1. Add the MCP Configuration
+From your project root, run:
+
+```bash
+npx -y --package=veilguard veilguard-cli init
+```
+
+Veilguard asks which IDE(s) you use, then sets each one up. The MCP server config is written to the IDE's **global** location (in your home folder), so it works across all your projects and **nothing is added to your repo**. The optional AI rules file (`.cursorrules`, `.windsurfrules`, `CLAUDE.md`, …) is written to the project and auto-added to `.gitignore`. Pick one or several (e.g. `1,3,4`). Then restart your IDE.
+
+### Option B — Manual setup
 
 Copy this JSON into your IDE's MCP config file:
 
@@ -43,17 +51,32 @@ Copy this JSON into your IDE's MCP config file:
 <details>
 <summary><strong>📍 Config file locations by IDE</strong></summary>
 
-| IDE | Config Location |
-|-----|-----------------|
-| **Cursor** | `.cursor/mcp.json` in your project folder |
-| **Windsurf** | `~/.windsurf/mcp.json` (global) |
-| **VS Code** | Settings → search "MCP" → Edit in settings.json |
-| **Claude Code** | Run: `claude mcp add veilguard -- npx -y --package=veilguard veilguard-mcp` |
-| **Antigravity** | `.gemini/mcp.json` in your project folder |
+| IDE | Config file | Config key |
+|-----|-------------|------------|
+| **Cursor** | `.cursor/mcp.json` (project) | `mcpServers` |
+| **VS Code** | `.vscode/mcp.json` (project) | `servers` + `"type": "stdio"` — see below |
+| **Windsurf** | `~/.windsurf/mcp.json` (global) | `mcpServers` |
+| **Claude Code** | run `claude mcp add veilguard -- npx -y --package=veilguard veilguard-mcp` | — |
+| **Antigravity** | `~/.gemini/antigravity/mcp_config.json` (global) | `mcpServers` |
+
+**VS Code** uses a slightly different shape — top-level `servers` and an explicit `type`:
+
+```json
+{
+  "servers": {
+    "veilguard": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "--package=veilguard", "veilguard-mcp"],
+      "env": { "VEILGUARD_KEY": "" }
+    }
+  }
+}
+```
 
 </details>
 
-### 2. Restart Your IDE
+### Restart your IDE
 
 Close and reopen your IDE. Veilguard starts automatically.
 
@@ -109,7 +132,7 @@ Your AI agent calls Veilguard tools **automatically** while you code:
 | All CVE severities | — | ✅ |
 | Git history scanning | — | ✅ |
 
-**Pro:** $19/month · 3 graded audits/month · [Get Pro →](https://veilguard.dev/pro)
+**Pro:** $19/month · unlimited audits/month · [Get Pro →](https://veilguard.dev/pro)
 
 ## Contributing
 
