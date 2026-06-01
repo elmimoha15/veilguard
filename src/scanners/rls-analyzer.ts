@@ -1,5 +1,6 @@
 import { scanDirectory } from '../utils/glob-scanner.js';
 import { readFileSafe } from '../utils/file-reader.js';
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 async function analyzeMigrations(directory: string): Promise<Finding[]> {
@@ -159,7 +160,7 @@ export async function analyzeRls(directory: string, _tier: Tier): Promise<ScanRe
   };
 }
 
-export function formatRlsResults(result: ScanResult, _tier: Tier): string {
+export function formatRlsResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
 
   if (findings.length === 0) {
@@ -170,8 +171,7 @@ export function formatRlsResults(result: ScanResult, _tier: Tier): string {
   for (const f of findings) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
-    if (f.breach_precedent) lines.push(`  Breach: ${f.breach_precedent}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
   return lines.join('\n');

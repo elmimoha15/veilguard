@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { readFileSafe, readJsonFile } from '../utils/file-reader.js';
 import { scanDirectory } from '../utils/glob-scanner.js';
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 async function findRulesFile(directory: string): Promise<string | null> {
@@ -121,7 +122,7 @@ export async function analyzeFirebase(directory: string, _tier: Tier): Promise<S
   };
 }
 
-export function formatFirebaseResults(result: ScanResult, _tier: Tier): string {
+export function formatFirebaseResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
 
   if (findings.length === 0) {
@@ -132,7 +133,7 @@ export function formatFirebaseResults(result: ScanResult, _tier: Tier): string {
   for (const f of findings) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
   return lines.join('\n');

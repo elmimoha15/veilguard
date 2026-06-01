@@ -3,6 +3,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 import { readFileSafe } from '../utils/file-reader.js';
 import { scanDirectory } from '../utils/glob-scanner.js';
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 async function fileExists(path: string): Promise<boolean> {
@@ -138,7 +139,7 @@ export async function checkEnv(directory: string, _tier: Tier): Promise<ScanResu
   };
 }
 
-export function formatEnvResults(result: ScanResult, _tier: Tier): string {
+export function formatEnvResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
 
   if (findings.length === 0) {
@@ -157,7 +158,7 @@ export function formatEnvResults(result: ScanResult, _tier: Tier): string {
   for (const f of findings) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
 

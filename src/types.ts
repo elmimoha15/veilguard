@@ -100,11 +100,6 @@ export interface LicenseResult {
   expires_at?: string;
 }
 
-export interface AuditUsage {
-  count: number;
-  reset_date: string;
-}
-
 export type ScannerFn = (directory: string, tier: Tier) => Promise<ScanResult>;
 
 export interface ToolRegistration {

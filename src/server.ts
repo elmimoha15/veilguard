@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { validateLicense } from './license/license.js';
+import { validateLicense, getFullAuditMessage } from './license/license.js';
 import { scanSecrets, formatSecretResults } from './scanners/secret-scanner.js';
 import { checkEnv, formatEnvResults } from './scanners/env-checker.js';
 import { scanWebhooks, formatWebhookResults } from './scanners/webhook-scanner.js';
@@ -15,7 +15,112 @@ import { analyzeRls, formatRlsResults } from './scanners/rls-analyzer.js';
 import { analyzeFirebase, formatFirebaseResults } from './scanners/firebase-analyzer.js';
 import { scanAppSecurity, formatAppSecurityResults } from './scanners/app-security-scanner.js';
 import { scanRulesFiles, formatRulesFileResults } from './scanners/rules-file-scanner.js';
-import { runFullAudit, runAllScanners, formatAuditReport, formatLockedAuditReport } from './scanners/full-audit.js';
+import { runAllScanners, formatAuditReport } from './scanners/full-audit.js';
+import type { ScanResult, Tier } from './types.js';
+
+const DIR_ARG = {
+  directory: z.string().describe('Absolute path to the project root directory'),
+};
+
+// The 13 directory-based scanner tools. Each resolves the caller's real tier
+// (free vs pro) so the formatter can gate fixes/breach context — free users see
+// the alert, Pro users see the solution.
+const DIR_TOOLS: Array<{
+  name: string;
+  description: string;
+  scanner: (dir: string, tier: Tier) => Promise<ScanResult>;
+  formatter: (result: ScanResult, tier: Tier) => string;
+}> = [
+  {
+    name: 'scan_secrets',
+    description:
+      'Scan project files for hardcoded API keys, tokens, and passwords. Supports 60+ providers including Stripe, Supabase, OpenAI, Paystack, Flutterwave, M-Pesa, AWS, and more.',
+    scanner: scanSecrets,
+    formatter: formatSecretResults,
+  },
+  {
+    name: 'check_env',
+    description:
+      'Verify .env files are gitignored, check for secrets exposed via NEXT_PUBLIC_ prefix, and validate environment configuration.',
+    scanner: checkEnv,
+    formatter: formatEnvResults,
+  },
+  {
+    name: 'scan_webhooks',
+    description:
+      'Find webhook endpoints missing signature verification. Checks Stripe constructEvent, Paystack HMAC, M-Pesa IP validation, GitHub signature.',
+    scanner: scanWebhooks,
+    formatter: formatWebhookResults,
+  },
+  {
+    name: 'scan_injection',
+    description:
+      'Detect SQL injection via template literals, unsanitized req.body passed to database, and command injection via exec/eval.',
+    scanner: scanInjection,
+    formatter: formatInjectionResults,
+  },
+  {
+    name: 'check_auth_config',
+    description:
+      'Validate authentication setup — Clerk, NextAuth, Supabase Auth. Checks email verification, session management, rate limiting, getSession vs getUser.',
+    scanner: checkAuthConfig,
+    formatter: formatAuthResults,
+  },
+  {
+    name: 'check_git',
+    description:
+      'Check git security — secrets in history, exposed .git directory, .gitignore gaps, tracked .env files.',
+    scanner: checkGit,
+    formatter: formatGitResults,
+  },
+  {
+    name: 'check_cors',
+    description:
+      'Detect CORS misconfigurations — wildcard origins, missing origin filtering, cors() with no options.',
+    scanner: checkCors,
+    formatter: formatCorsResults,
+  },
+  {
+    name: 'check_supply_chain',
+    description: 'Detect malicious and typosquatted npm packages that AI tools sometimes suggest.',
+    scanner: checkSupplyChain,
+    formatter: formatSupplyChainResults,
+  },
+  {
+    name: 'scan_dependencies',
+    description: 'Check npm packages for known CVEs via Google OSV.dev database.',
+    scanner: scanDependencies,
+    formatter: formatDependencyResults,
+  },
+  {
+    name: 'check_supabase_rls',
+    description:
+      'Deep audit of Supabase Row Level Security policies. Catches USING(true), auth.role() misuse, auth.uid() IS NOT NULL bypass, missing policies, and select(*) without filters.',
+    scanner: analyzeRls,
+    formatter: formatRlsResults,
+  },
+  {
+    name: 'check_firebase',
+    description:
+      'Analyze Firebase security rules for open access patterns, client-controlled auth checks, and missing restrictions.',
+    scanner: analyzeFirebase,
+    formatter: formatFirebaseResults,
+  },
+  {
+    name: 'scan_app_security',
+    description:
+      'Detect application-layer security gaps: missing rate limiting, IDOR (Insecure Direct Object References), insecure password storage, unsafe file uploads, leaking error stack traces, sensitive data in logs, open redirects, and mass assignment via req.body.',
+    scanner: scanAppSecurity,
+    formatter: formatAppSecurityResults,
+  },
+  {
+    name: 'scan_rules_files',
+    description:
+      'Scan AI rules files (.cursorrules, .windsurfrules, CLAUDE.md, etc.) for hidden Unicode backdoors, base64 payloads, suspicious URLs, and malicious instructions.',
+    scanner: scanRulesFiles,
+    formatter: formatRulesFileResults,
+  },
+];
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -23,166 +128,40 @@ export function createServer(): McpServer {
     version: '0.3.0',
   });
 
-  // all scanners run at pro depth — only full_audit is gated
-  const TIER = 'pro' as const;
-
-  server.tool(
-    'scan_secrets',
-    'Scan project files for hardcoded API keys, tokens, and passwords. Supports 60+ providers including Stripe, Supabase, OpenAI, Paystack, Flutterwave, M-Pesa, AWS, and more.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await scanSecrets(directory, TIER);
-      return { content: [{ type: 'text', text: formatSecretResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_env',
-    'Verify .env files are gitignored, check for secrets exposed via NEXT_PUBLIC_ prefix, and validate environment configuration.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await checkEnv(directory, TIER);
-      return { content: [{ type: 'text', text: formatEnvResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'scan_webhooks',
-    'Find webhook endpoints missing signature verification. Checks Stripe constructEvent, Paystack HMAC, M-Pesa IP validation, GitHub signature.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await scanWebhooks(directory, TIER);
-      return { content: [{ type: 'text', text: formatWebhookResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'scan_injection',
-    'Detect SQL injection via template literals, unsanitized req.body passed to database, and command injection via exec/eval.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await scanInjection(directory, TIER);
-      return { content: [{ type: 'text', text: formatInjectionResults(result, TIER) }] };
-    },
-  );
+  for (const tool of DIR_TOOLS) {
+    server.tool(tool.name, tool.description, DIR_ARG, async ({ directory }) => {
+      const { tier } = await validateLicense();
+      const result = await tool.scanner(directory, tier);
+      return { content: [{ type: 'text', text: tool.formatter(result, tier) }] };
+    });
+  }
 
   server.tool(
     'check_headers',
     'Verify security headers (CSP, HSTS, X-Frame-Options, etc.) on a deployed URL.',
     { url: z.string().url().describe('The deployed URL to check (e.g. https://myapp.vercel.app)') },
     async ({ url }) => {
-      const result = await checkHeaders(url, TIER);
-      return { content: [{ type: 'text', text: formatHeaderResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_auth_config',
-    'Validate authentication setup — Clerk, NextAuth, Supabase Auth. Checks email verification, session management, rate limiting, getSession vs getUser.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await checkAuthConfig(directory, TIER);
-      return { content: [{ type: 'text', text: formatAuthResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_git',
-    'Check git security — secrets in history, exposed .git directory, .gitignore gaps, tracked .env files.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await checkGit(directory, TIER);
-      return { content: [{ type: 'text', text: formatGitResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_cors',
-    "Detect CORS misconfigurations — wildcard origins, missing origin filtering, cors() with no options.",
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await checkCors(directory, TIER);
-      return { content: [{ type: 'text', text: formatCorsResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_supply_chain',
-    'Detect malicious and typosquatted npm packages that AI tools sometimes suggest.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await checkSupplyChain(directory, TIER);
-      return { content: [{ type: 'text', text: formatSupplyChainResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'scan_dependencies',
-    'Check npm packages for known CVEs via Google OSV.dev database.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await scanDependencies(directory, TIER);
-      return { content: [{ type: 'text', text: formatDependencyResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_supabase_rls',
-    'Deep audit of Supabase Row Level Security policies. Catches USING(true), auth.role() misuse, auth.uid() IS NOT NULL bypass, missing policies, and select(*) without filters.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await analyzeRls(directory, TIER);
-      return { content: [{ type: 'text', text: formatRlsResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'check_firebase',
-    'Analyze Firebase security rules for open access patterns, client-controlled auth checks, and missing restrictions.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await analyzeFirebase(directory, TIER);
-      return { content: [{ type: 'text', text: formatFirebaseResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'scan_app_security',
-    'Detect application-layer security gaps: missing rate limiting, IDOR (Insecure Direct Object References), insecure password storage, unsafe file uploads, leaking error stack traces, sensitive data in logs, open redirects, and mass assignment via req.body.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await scanAppSecurity(directory, TIER);
-      return { content: [{ type: 'text', text: formatAppSecurityResults(result, TIER) }] };
-    },
-  );
-
-  server.tool(
-    'scan_rules_files',
-    'Scan AI rules files (.cursorrules, .windsurfrules, CLAUDE.md, etc.) for hidden Unicode backdoors, base64 payloads, suspicious URLs, and malicious instructions.',
-    { directory: z.string().describe('Absolute path to the project root directory') },
-    async ({ directory }) => {
-      const result = await scanRulesFiles(directory, TIER);
-      return { content: [{ type: 'text', text: formatRulesFileResults(result, TIER) }] };
+      const { tier } = await validateLicense();
+      const result = await checkHeaders(url, tier);
+      return { content: [{ type: 'text', text: formatHeaderResults(result, tier) }] };
     },
   );
 
   server.tool(
     'full_audit',
-    'Run all 14 security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Requires VEILGUARD_KEY for the grade; free users see findings with a locked grade.',
+    'Run all security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Pro only — unlimited. Free users get an upgrade prompt (no audit).',
     { directory: z.string().describe('Absolute path to the project root directory') },
     async ({ directory }) => {
-      const license = await validateLicense();
+      const { tier } = await validateLicense();
 
-      if (license.tier !== 'pro') {
-        const report = await runAllScanners(directory, TIER);
-        return { content: [{ type: 'text', text: formatLockedAuditReport(report) }] };
+      // Full audit is Pro-only. Free gets no audit at all — just the upsell.
+      if (tier !== 'pro') {
+        return { content: [{ type: 'text', text: getFullAuditMessage() }] };
       }
 
-      const result = await runFullAudit(directory, license.tier);
-      if (typeof result === 'string') {
-        return { content: [{ type: 'text', text: result }] };
-      }
-      return { content: [{ type: 'text', text: formatAuditReport(result) }] };
+      // Pro: unlimited full audits, with grade + AI-ready fix prompt.
+      const report = await runAllScanners(directory, tier);
+      return { content: [{ type: 'text', text: formatAuditReport(report) }] };
     },
   );
 

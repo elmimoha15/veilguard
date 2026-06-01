@@ -1,3 +1,4 @@
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 interface HeaderCheck {
@@ -114,7 +115,7 @@ export async function checkHeaders(url: string, _tier: Tier): Promise<ScanResult
   };
 }
 
-export function formatHeaderResults(result: ScanResult, _tier: Tier): string {
+export function formatHeaderResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
   const issues = findings.filter((f) => f.severity !== 'passed');
 
@@ -130,7 +131,7 @@ export function formatHeaderResults(result: ScanResult, _tier: Tier): string {
   for (const f of issues) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
 

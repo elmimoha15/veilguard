@@ -3,6 +3,7 @@ import { join } from 'path';
 import { readJsonFile } from '../utils/file-reader.js';
 import { logger } from '../utils/logger.js';
 import { getPatternsDir } from '../utils/paths.js';
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, MaliciousPackagesDB, Tier } from '../types.js';
 
 let dbCache: MaliciousPackagesDB | null = null;
@@ -123,7 +124,7 @@ export async function checkSupplyChain(directory: string, tier: Tier): Promise<S
   };
 }
 
-export function formatSupplyChainResults(result: ScanResult, _tier: Tier): string {
+export function formatSupplyChainResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
   const issues = findings.filter((f) => f.severity !== 'info' && f.severity !== 'passed');
 
@@ -135,7 +136,7 @@ export function formatSupplyChainResults(result: ScanResult, _tier: Tier): strin
   for (const f of findings) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
   return lines.join('\n');

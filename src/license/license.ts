@@ -2,14 +2,12 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import {
   VEILGUARD_HOME,
   LICENSE_CACHE_PATH,
-  AUDIT_USAGE_PATH,
   LICENSE_API_URL,
   LICENSE_CACHE_DURATION_MS,
-  PRO_AUDIT_LIMIT,
 } from '../utils/constants.js';
 import { fetchSafe } from '../utils/http.js';
 import { logger } from '../utils/logger.js';
-import type { LicenseResult, AuditUsage, Tier } from '../types.js';
+import type { LicenseResult, Tier, Finding } from '../types.js';
 
 async function ensureDir(): Promise<void> {
   try {
@@ -84,58 +82,39 @@ export async function validateLicense(): Promise<LicenseResult> {
   }
 }
 
-async function readAuditUsage(): Promise<AuditUsage> {
-  try {
-    const raw = await readFile(AUDIT_USAGE_PATH, 'utf-8');
-    const usage = JSON.parse(raw) as AuditUsage;
+// The full security audit (grade + AI fix prompt) is a Pro-only tool. Free
+// users get this upsell instead — they do not get any full audit at all.
+export function getFullAuditMessage(): string {
+  return [
+    '~~ veilguard ~~ Full audit is a Pro feature 🔒',
+    '',
+    'The full security audit grades your whole project (A+ to F) and writes an',
+    'AI-ready fix prompt that patches every issue at once. It\'s unlimited on Pro.',
+    '',
+    'Want your grade and the one-paste fix? Upgrade to Pro:',
+    '→ veilguard.dev/pro ($19/mo or $149/yr — save 35%)',
+    '',
+    'Meanwhile, the individual scanners still run free and will alert you to any',
+    'vulnerability they find (the fixes for those are unlocked with Pro too).',
+    '',
+    'Add your key to the MCP config: VEILGUARD_KEY=your_key_here',
+  ].join('\n');
+}
 
-    // Check if reset date has passed
-    const resetDate = new Date(usage.reset_date);
-    if (new Date() >= resetDate) {
-      return { count: 0, reset_date: getNextResetDate() };
-    }
-    return usage;
-  } catch {
-    return { count: 0, reset_date: getNextResetDate() };
+// The free/pro gate for an individual finding's "solution". Free users see the
+// ALERT (severity, title, message) but never the fix or breach context — those
+// are the paid value, and we actively offer the upgrade. Pro users get both.
+// Every scanner formatter routes its fix/breach lines through this so the gate
+// stays consistent.
+export function renderFix(f: Finding, tier: Tier, indent = '  '): string[] {
+  if (!f.fix && !f.breach_precedent) return []; // nothing to hide or show
+  if (tier === 'pro') {
+    const out: string[] = [];
+    if (f.fix) out.push(`${indent}Fix: ${f.fix}`);
+    if (f.breach_precedent) out.push(`${indent}Breach: ${f.breach_precedent}`);
+    return out;
   }
-}
-
-function getNextResetDate(): string {
-  const now = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return next.toISOString();
-}
-
-export async function checkAuditLimit(): Promise<{ allowed: boolean; message?: string }> {
-  const usage = await readAuditUsage();
-
-  if (usage.count >= PRO_AUDIT_LIMIT) {
-    const resetDate = new Date(usage.reset_date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    return {
-      allowed: false,
-      message: [
-        '~~ veilguard ~~ audit limit reached',
-        '',
-        `You've used ${usage.count}/${PRO_AUDIT_LIMIT} full audits this month. Resets on ${resetDate}.`,
-        '',
-        'You can still run every individual scanner with full results anytime.',
-        'Only the combined full_audit is limited to 3/month.',
-      ].join('\n'),
-    };
-  }
-
-  return { allowed: true };
-}
-
-export async function incrementAuditUsage(): Promise<void> {
-  await ensureDir();
-  const usage = await readAuditUsage();
-  usage.count += 1;
-  await writeFile(AUDIT_USAGE_PATH, JSON.stringify(usage, null, 2));
+  return [`${indent}Fix: 🔒 Want the fix? It's a Pro feature — unlock the exact solution at veilguard.dev/pro`];
 }
 
 export function getUpgradeMessage(hiddenCount: number): string {
@@ -152,7 +131,8 @@ export function getUpgradeMessage(hiddenCount: number): string {
     '  ✓ All dependencies checked',
     '  ✓ Supabase RLS deep audit',
     '  ✓ Firebase rules audit',
-    '  ✓ Full security audit with grade (3/month)',
+    '  ✓ Unlimited full audits with grade (A+ to F)',
+    '  ✓ AI-ready fix prompt (paste to fix everything)',
     '  ✓ Breach precedent context',
     '',
     'Add your key to the MCP config:',

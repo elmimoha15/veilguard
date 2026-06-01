@@ -38,31 +38,29 @@ If you already have a `CLAUDE.md`, append the Veilguard rules to the end of it.
 
 ---
 
-## Step 3 — Add post-save hooks (recommended)
+## Step 3 — Add the post-edit hook (recommended)
 
-Create `.claude/hooks.json` in your project:
+Add a `PostToolUse` hook to `.claude/settings.local.json` in your project (`veilguard init` does this for you):
 
 ```json
 {
   "hooks": {
-    "postSave": [
+    "PostToolUse": [
       {
-        "pattern": "**/*.{ts,tsx,js,jsx,json,sql,env,toml,yaml,yml}",
-        "command": "npx veilguard quick-scan --file $FILE",
-        "description": "Veilguard: scan saved file for security issues"
-      }
-    ],
-    "preDeploy": [
-      {
-        "command": "npx veilguard quick-scan --dir .",
-        "description": "Veilguard: pre-deploy security check"
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y --package=veilguard veilguard-cli scan-hook"
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-These hooks fire on **every file save** — not just AI writes, but your manual edits too. Clean scans are silent.
+This fires every time the AI edits or writes a file: `scan-hook` scans just that file, stays silent if it's clean, and surfaces any finding back into the conversation. Hooks live under the `hooks` key in a settings file — Claude Code has no `.claude/hooks.json` and no `postSave`/`preDeploy` events.
 
 ---
 

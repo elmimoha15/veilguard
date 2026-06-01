@@ -3,7 +3,7 @@ import { readJsonFile } from '../utils/file-reader.js';
 import { fetchSafe } from '../utils/http.js';
 import { OSV_API_URL, FREE_TIER_MAX_FINDINGS } from '../utils/constants.js';
 import { logger } from '../utils/logger.js';
-import { getUpgradeMessage } from '../license/license.js';
+import { getUpgradeMessage, renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 interface OsvVuln {
@@ -131,7 +131,7 @@ export function formatDependencyResults(result: ScanResult, tier: Tier): string 
   for (const f of visible) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
 

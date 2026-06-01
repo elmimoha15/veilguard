@@ -12,7 +12,6 @@ import { analyzeFirebase } from './firebase-analyzer.js';
 import { scanAppSecurity } from './app-security-scanner.js';
 import { scanRulesFiles } from './rules-file-scanner.js';
 import { calculateScore, summarizeFindings, generateFixPrompt, gradeMeaning } from './scoring.js';
-import { checkAuditLimit, incrementAuditUsage } from '../license/license.js';
 import { logger } from '../utils/logger.js';
 import type { AuditReport, ScanResult, Tier } from '../types.js';
 
@@ -63,17 +62,6 @@ export async function runAllScanners(directory: string, tier: Tier): Promise<Aud
   };
 
   logger.info(`Scans complete: Grade ${grade} (${score}/100) in ${Date.now() - start}ms`);
-  return report;
-}
-
-export async function runFullAudit(directory: string, tier: Tier): Promise<AuditReport | string> {
-  const limitCheck = await checkAuditLimit();
-  if (!limitCheck.allowed) {
-    return limitCheck.message!;
-  }
-
-  const report = await runAllScanners(directory, tier);
-  await incrementAuditUsage();
   return report;
 }
 
@@ -323,65 +311,3 @@ export function formatAuditReport(report: AuditReport): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
-export function formatLockedAuditReport(report: AuditReport): string {
-  const criticals = collectRendered(report, 'critical');
-  const warnings = collectRendered(report, 'warning');
-  const total = criticals.length + warnings.length;
-
-  const lines: string[] = [];
-  lines.push('🛡️ Veilguard Security Audit');
-  lines.push(DIVIDER);
-  lines.push('');
-  lines.push(`Found: ${total} ${total === 1 ? 'issue' : 'issues'}`);
-  lines.push('');
-
-  if (criticals.length > 0) {
-    lines.push(DIVIDER);
-    lines.push(
-      `🔴 CRITICAL — Fix before deploying (${criticals.length} ${criticals.length === 1 ? 'issue' : 'issues'})`,
-    );
-    lines.push(DIVIDER);
-    renderFindingBlock(lines, criticals, 1, true);
-  }
-
-  if (warnings.length > 0) {
-    lines.push(DIVIDER);
-    lines.push(
-      `🟡 WARNINGS — Fix soon (${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'})`,
-    );
-    lines.push(DIVIDER);
-    renderFindingBlock(lines, warnings, criticals.length + 1, true);
-  }
-
-  if (total === 0) {
-    lines.push(DIVIDER);
-    lines.push('✅ No critical issues or warnings were found in this scan.');
-    lines.push(DIVIDER);
-    lines.push('');
-  }
-
-  // What passed
-  const passed = buildPassedSection(report);
-  if (passed.length > 0) {
-    lines.push(DIVIDER);
-    lines.push(`✅ What passed (${passed.length} ${passed.length === 1 ? 'check' : 'checks'})`);
-    lines.push(DIVIDER);
-    for (const p of passed) lines.push(`• ${p}`);
-    lines.push('');
-  }
-
-  // Locked grade upsell — replaces the grade + AI fix prompt sections.
-  lines.push(DIVIDER);
-  lines.push('🔒 Your security grade is locked');
-  lines.push(DIVIDER);
-  lines.push('');
-  lines.push('Veilguard scanned your project and found the issues above.');
-  lines.push('To unlock your grade (A+ to F), detailed fix instructions,');
-  lines.push('and AI-ready fix prompt:');
-  lines.push('');
-  lines.push('→ veilguard.dev/pro — $15/month, unlimited full audits');
-  lines.push('');
-  lines.push('Add VEILGUARD_KEY to your MCP config and run full audit again.');
-
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
-}

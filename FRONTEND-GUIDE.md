@@ -130,7 +130,7 @@ Exact paths per IDE:
 | Cursor | `~/.cursor/mcp.json` | `.cursorrules` |
 | VS Code | user `mcp.json` (platform path, see §5) | — |
 | Windsurf | `~/.windsurf/mcp.json` | `.windsurfrules` |
-| Claude Code | `~/.claude.json` (via `claude mcp add … -s user`) | `CLAUDE.md`, `.claude/hooks.json` |
+| Claude Code | `~/.claude.json` (via `claude mcp add … -s user`) | `CLAUDE.md`, `.claude/settings.local.json` |
 | Antigravity | `~/.gemini/antigravity/mcp_config.json` | — |
 
 - Existing config files are **merged** — other MCP servers you already have are preserved.
@@ -249,14 +249,13 @@ for the full contract.
 
 ## 7. Pricing
 
-- **Free** — $0. All scanners run in your IDE. The `full_audit` grade is locked.
-- **Pro** — **$19/month** (or **$149/year**, ~35% off). Unlocks the graded
-  full audit (A+–F), AI-ready fix prompts, all CVE severities, git-history
-  deep scanning, and breach-precedent context.
-
-> ⚠️ The codebase currently has conflicting pricing/limit strings (a `$15/mo`
-> and a "3 audits/month" limit in some messages). Pick the canonical values and
-> see §12 before publishing.
+- **Free** — $0. All 14 scanners run in your IDE and **alert** you to every
+  vulnerability. The **fix/solution** for each finding is locked (Veilguard
+  offers the upgrade), and the combined `full_audit` is **not available** on free.
+- **Pro** — **$19/month** (or **$149/year**, ~35% off). Unlocks the exact fix
+  for every finding, the **unlimited** graded full audit (A+–F), AI-ready fix
+  prompts, all CVE severities, git-history deep scanning, and breach-precedent
+  context.
 
 ---
 
@@ -346,20 +345,20 @@ Reusable copy that matches the package's voice:
 
 ---
 
-## 12. ⚠️ Things to align before launch
+## 12. Tier model (canonical — code + copy now agree)
 
-These are real inconsistencies in the current package. Decide the canonical
-value and make the site + code agree:
+Resolved and implemented across the MCP server and site:
 
-1. **Pricing:** README says **$19/mo**; the locked-audit message in code says
-   **$15/mo**. The upgrade message says **$19/mo or $149/yr**.
-2. **Audit limit:** README says **unlimited** audits; code enforces **3/month**
-   (`PRO_AUDIT_LIMIT = 3`) and several messages say "3/month".
-3. **Scanner count:** site/README say **14 scanners / 15 tools**; the `init`
-   closing line says **13 scanners**.
-4. **`init` Free line** says scanners are "depth-limited," but in IDE/MCP mode
-   they run at full depth (see §9 nuance).
-
-Tell me which values are canonical and I'll fix the code + all copy to match in
-one pass.
+1. **Pricing:** **$19/mo** or **$149/yr** (~35% off). The old `$15/mo`
+   locked-audit string was removed.
+2. **Full audit:** **Pro-only and unlimited.** **Free gets no full audit** —
+   `full_audit` returns an upgrade prompt. The per-month limit /
+   `PRO_AUDIT_LIMIT` / `usage.json` tracking was removed.
+3. **Fixes & breach context:** Pro-only. Free shows the alert for every finding
+   and offers the upgrade; gated by `renderFix()` in `src/license/license.ts`.
+4. **Scanner count:** **14 scanners** (+ `full_audit` = 15 tools). `full_audit`
+   runs the 13 codebase scanners (Security Headers needs a live URL).
+5. **Free depth limits (now active):** dependency = critical CVEs only; supply
+   chain = first 20 packages; git = current files only — scanners receive the
+   caller's real tier, so the "depth-limited" framing for free is accurate.
 ```

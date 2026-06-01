@@ -61,26 +61,24 @@ You write a new API route. Your AI agent:
 
 ---
 
-## Claude Code: post-save hooks
+## Claude Code: the PostToolUse hook
 
-Claude Code gets an extra layer of protection beyond what the AI agent decides to do.
+Claude Code gets an extra, deterministic layer of protection beyond what the AI agent decides to do — a real hook that fires every time the agent edits or writes a file.
 
-A `hooks.json` file is written to `.claude/hooks.json` that triggers Veilguard on **every file save** — not just AI writes, but your own manual edits too:
+`veilguard init` adds a `PostToolUse` hook to `.claude/settings.local.json` (project-local, gitignored):
 
 ```json
 {
   "hooks": {
-    "postSave": [
+    "PostToolUse": [
       {
-        "pattern": "**/*.{ts,tsx,js,jsx,json,sql,env,toml,yaml,yml}",
-        "command": "npx veilguard quick-scan --file $FILE",
-        "description": "Veilguard: scan saved file for security issues"
-      }
-    ],
-    "preDeploy": [
-      {
-        "command": "npx veilguard quick-scan --dir .",
-        "description": "Veilguard: pre-deploy security check"
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y --package=veilguard veilguard-cli scan-hook"
+          }
+        ]
       }
     ]
   }
@@ -88,10 +86,11 @@ A `hooks.json` file is written to `.claude/hooks.json` that triggers Veilguard o
 ```
 
 This means:
-- **postSave:** every time you save a `.ts`, `.tsx`, `.js`, `.jsx`, `.json`, `.sql`, `.env`, `.toml`, `.yaml`, or `.yml` file, a quick scan runs against it
-- **preDeploy:** a full directory scan runs before any deploy
+- Every time the AI **edits or writes** a file, `scan-hook` scans **just that file** and routes the right scanners by file type (secrets/injection always; webhooks + RLS for source files; supply-chain for `package.json`; etc.).
+- If the file is **clean**, the hook exits silently — nothing is shown.
+- If it finds a vulnerability, the finding is injected back into the conversation and the agent reports it in plain English and offers a fix.
 
-Both hooks are silent — output only appears if a finding is returned.
+The hook fires on the agent's edits, not on files you save by hand in another editor. Because `PostToolUse` runs after the write, it never blocks your edit.
 
 ---
 

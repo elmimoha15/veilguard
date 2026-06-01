@@ -206,12 +206,12 @@ Covers eight categories:
 ## Pro scanner
 
 ### `full_audit`
-**Runs all 13 scanners and produces a graded report with an AI-ready fix prompt.**
+**Runs all 13 codebase scanners and produces a graded report with an AI-ready fix prompt.**
 
 See the [Full Audit](/docs/full-audit) page for the complete breakdown.
 
-**Requires:** `VEILGUARD_KEY` set in your MCP config  
-**Limit:** 3 audits per month (resets on the 1st)  
+**Requires:** `VEILGUARD_KEY` set in your MCP config (Pro)  
+**Limit:** unlimited on Pro  
 **Input:** `directory`
 
-Free users can call `full_audit` — they see all findings in plain English but the letter grade is locked until they upgrade.
+The full audit is **Pro-only**. On free, calling `full_audit` returns an upgrade prompt — no grade, no report. Free users run the individual scanners above for unlimited vulnerability alerts (the fixes unlock with Pro).

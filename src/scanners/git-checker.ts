@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { execSync } from 'child_process';
 import { readFileSafe } from '../utils/file-reader.js';
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 function isGitRepo(directory: string): boolean {
@@ -138,7 +139,7 @@ export async function checkGit(directory: string, tier: Tier): Promise<ScanResul
   };
 }
 
-export function formatGitResults(result: ScanResult, _tier: Tier): string {
+export function formatGitResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
   const issues = findings.filter((f) => f.severity !== 'passed' && f.severity !== 'info');
 
@@ -151,7 +152,7 @@ export function formatGitResults(result: ScanResult, _tier: Tier): string {
     if (f.severity === 'passed') continue;
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
 

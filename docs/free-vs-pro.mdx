@@ -7,41 +7,46 @@
 | | Free | Pro |
 |--|------|-----|
 | **Price** | $0 forever | $19/month or $149/year (save 35%) |
-| **All 13 scanners** | ✅ | ✅ |
-| **Supabase RLS audit** | ✅ | ✅ |
-| **Firebase audit** | ✅ | ✅ |
-| **Full audit with grade** | 🔒 Grade locked | ✅ 3/month |
+| **All 14 scanners** | ✅ | ✅ |
+| **Supabase RLS audit** | ✅ Alert only | ✅ + fix |
+| **Firebase audit** | ✅ Alert only | ✅ + fix |
+| **Vulnerability alerts** | ✅ Every finding | ✅ Every finding |
+| **Fix / solution for each finding** | 🔒 Locked | ✅ |
+| **Breach context** | 🔒 Locked | ✅ |
+| **Full security audit (grade + fix prompt)** | ❌ Not included | ✅ Unlimited |
 | **AI-ready fix prompt** | ❌ | ✅ |
-| **Findings shown** | All findings | All findings |
-| **Fix suggestions** | ✅ | ✅ |
+
+> Free **alerts you to every vulnerability** so you always know what's wrong. The
+> **fixes** — and the full security audit with its letter grade + AI fix prompt —
+> are what Pro unlocks. When a fix is locked, Veilguard offers you the upgrade.
 
 ---
 
 ## What "depth-limited" means on free
 
-All 13 scanners run on the free tier, but some show fewer results than Pro:
+All 14 scanners run on the free tier and alert you to every vulnerability they find. The difference is the solution (and some scan depth):
 
 | Scanner | Free | Pro |
 |---------|------|-----|
-| Findings per scan | All findings shown | All findings shown |
-| Fix suggestions | Shown | Shown |
+| Vulnerability alerts | Every finding | Every finding |
+| Fix / solution | 🔒 Locked (alert only) | Shown |
+| Breach context | 🔒 Locked | Shown (which real breach each pattern caused) |
 | Dependency scanning | Critical CVEs only | All severities (critical, high, medium, low) |
 | Git history scan | Current files only | Full history scan |
 | Supply chain check | Top 20 dependencies | All dependencies |
-| Breach context | Hidden | Shown (which real breach each pattern caused) |
 
 ---
 
 ## What only Pro unlocks
 
-### Letter grade
-Free users who call `full_audit` see all their findings — critical issues, warnings, file locations, fix suggestions — but the letter grade (A+ to F) is hidden until they upgrade.
+### The fixes (and breach context)
+On free, every finding shows the alert — what's wrong, where, and the real-world consequence — but the **fix/solution** and **breach context** are locked, and Veilguard prompts you to upgrade. Pro reveals the exact fix for every finding.
 
-### AI-ready fix prompt
-The copy-paste block that lets your AI agent fix everything at once in a single request is a Pro-only feature of `full_audit`.
+### The full security audit
+The combined `full_audit` (security score, letter grade A+ to F, and the AI-ready one-paste fix prompt) is **Pro-only**. On free, calling it returns an upgrade prompt — no grade, no report. Free users still run the 14 individual scanners for unlimited alerts.
 
 ### Full depth on dependency and git scans
-Pro shows all CVE severities (not just critical) and scans your full git history for committed secrets.
+Pro shows all CVE severities (not just critical), checks all dependencies (not just the first 20), and scans your full git history for committed secrets.
 
 ---
 
@@ -77,8 +82,8 @@ The annual plan ($149/year) saves 35% vs monthly ($228/year) and locks in your r
 
 ---
 
-## Full audit limit
+## Full audit access
 
-Pro users get **3 full audits per month**. The counter resets on the 1st of every month.
+The full security audit is **Pro-only and unlimited**. **Free does not get any full audit** — calling `full_audit` on free returns an upgrade prompt.
 
-This limit is on `full_audit` only — all 13 individual scanners run with no limit on any tier.
+The 14 individual scanners run with no limit on any tier — free sees the alerts, Pro sees the fixes.

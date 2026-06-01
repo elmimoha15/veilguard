@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { readdir } from 'fs/promises';
 import { readFileSafe } from '../utils/file-reader.js';
+import { renderFix } from '../license/license.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 const RULES_FILES = [
@@ -249,7 +250,7 @@ export async function scanRulesFiles(directory: string, _tier: Tier): Promise<Sc
   };
 }
 
-export function formatRulesFileResults(result: ScanResult, _tier: Tier): string {
+export function formatRulesFileResults(result: ScanResult, tier: Tier): string {
   const { findings } = result;
   
   if (findings.length === 0) {
@@ -264,7 +265,7 @@ export function formatRulesFileResults(result: ScanResult, _tier: Tier): string 
   for (const f of findings) {
     lines.push(`${f.severity.toUpperCase()}: ${f.title}`);
     lines.push(`  ${f.message}`);
-    if (f.fix) lines.push(`  Fix: ${f.fix}`);
+    lines.push(...renderFix(f, tier));
     lines.push('');
   }
   

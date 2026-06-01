@@ -1,5 +1,5 @@
-import { readdir, readFile } from 'fs/promises';
-import { join, relative, extname } from 'path';
+import { readdir, readFile, stat } from 'fs/promises';
+import { join, relative, extname, basename } from 'path';
 import { SKIP_DIRS, CODE_EXTENSIONS } from './constants.js';
 import { logger } from './logger.js';
 
@@ -44,6 +44,21 @@ export async function scanDirectory(
   rootDir: string,
   extensions?: string[],
 ): Promise<string[]> {
+  // Allow a single file to be passed in place of a directory. This is what the
+  // per-edit hook (and `quick-scan --file`) relies on: scanning just the changed
+  // file. Without this, readdir() below would throw ENOTDIR on a file path.
+  try {
+    const rootStat = await stat(rootDir);
+    if (rootStat.isFile()) {
+      const name = basename(rootDir);
+      // No .gitignore context for a single explicit target — the caller chose it.
+      return shouldIncludeFile(name, name, new Set(), extensions) ? [rootDir] : [];
+    }
+  } catch (error) {
+    logger.debug(`Cannot stat target: ${rootDir} — ${(error as Error).message}`);
+    return [];
+  }
+
   const files: string[] = [];
   const gitignored = await loadGitignore(rootDir);
 

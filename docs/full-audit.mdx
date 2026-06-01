@@ -1,9 +1,9 @@
 # Full Audit
 
-The `full_audit` tool runs all 13 scanners at once, calculates a security score, assigns a letter grade (A+ to F), and generates an AI-ready fix prompt you can paste into your agent to fix everything at once.
+The `full_audit` tool runs all 13 codebase scanners at once (every scanner except Security Headers, which needs a deployed URL), calculates a security score, assigns a letter grade (A+ to F), and generates an AI-ready fix prompt you can paste into your agent to fix everything at once.
 
-**Requires:** Pro license (`VEILGUARD_KEY` set in your MCP config)  
-**Limit:** 3 full audits per month (resets on the 1st of each month)
+**Pro only.** Pro gets **unlimited** full audits with the grade and AI-ready fix prompt.  
+**Free does not get the full audit at all** — calling it returns an upgrade prompt. (Free users still run the 14 individual scanners for unlimited vulnerability alerts.)
 
 ---
 
@@ -144,39 +144,32 @@ Apply all fixes while maintaining existing functionality.
 
 ## Free tier output
 
-Free users can call `full_audit` and see all findings — including file locations and fix suggestions — but the **letter grade is locked**:
+On the free tier, `full_audit` does **not** run — it returns an upgrade prompt:
 
 ```
-🛡️ Veilguard Security Audit
-─────────────────────────────
-Found: 1 issue
+~~ veilguard ~~ Full audit is a Pro feature 🔒
 
-─────────────────────────────
-🔴 CRITICAL — Fix before deploying (1 issue)
-─────────────────────────────
-1. Anyone can fake a payment and get your product for free
-   → File: src/app/api/webhooks/stripe/route.ts:14
-   → Fix: Wrap your handler with Stripe's constructEvent()...
+The full security audit grades your whole project (A+ to F) and writes an
+AI-ready fix prompt that patches every issue at once. It's unlimited on Pro.
 
-─────────────────────────────
-🔒 Your security grade is locked
-─────────────────────────────
-Veilguard scanned your project and found the issues above.
-To unlock your grade (A+ to F), detailed fix instructions,
-and AI-ready fix prompt:
+Want your grade and the one-paste fix? Upgrade to Pro:
+→ veilguard.dev/pro ($19/mo or $149/yr — save 35%)
 
-→ veilguard.dev/pro — $19/month, unlimited full audits
+Meanwhile, the individual scanners still run free and will alert you to any
+vulnerability they find (the fixes for those are unlocked with Pro too).
 
-Add VEILGUARD_KEY to your MCP config and run full audit again.
+Add your key to the MCP config: VEILGUARD_KEY=your_key_here
 ```
+
+To get the graded audit, run the individual scanners (free) to see what's wrong, then upgrade to Pro for the grade, fixes, and one-paste fix prompt.
 
 ---
 
-## Monthly limit
+## Access
 
-Pro users get **3 full audits per month**. The counter resets on the 1st of each month.
+The full audit is **Pro-only and unlimited**. **Free does not get any full audit.**
 
-If you hit the limit, individual scanners (all 13 of them) still run with no limit. Only `full_audit` is capped.
+The 14 individual scanners run with no limit on either tier — free sees the alerts, Pro sees the fixes.
 
 ---
 

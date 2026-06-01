@@ -151,7 +151,7 @@ MCP config → **global (HOME)**, merged. Rules files → **project**, gitignore
 | **1. Cursor** | `~/.cursor/mcp.json` (`mcpServers`) | `.cursorrules` |
 | **2. VS Code** | user `mcp.json` (`servers` + `type: stdio`) | *(none)* |
 | **3. Windsurf** | `~/.windsurf/mcp.json` (`mcpServers`) | `.windsurfrules` |
-| **4. Claude Code** | `~/.claude.json` via `claude mcp add veilguard -s user -- npx -y --package=veilguard veilguard-mcp` (skipped silently if the Claude CLI isn't installed) | `CLAUDE.md`, `.claude/hooks.json` |
+| **4. Claude Code** | `~/.claude.json` via `claude mcp add veilguard -s user -- npx -y --package=veilguard veilguard-mcp` (skipped silently if the Claude CLI isn't installed) | `CLAUDE.md`, `.claude/settings.local.json` |
 | **5. Antigravity** | `~/.gemini/antigravity/mcp_config.json` (`mcpServers`) | *(none)* |
 
 All generated MCP configs use the canonical args from §2, including the empty
@@ -178,7 +178,7 @@ global, so they don't need ignoring):
 | Cursor | `.cursorrules` |
 | VS Code | *(none)* |
 | Windsurf | `.windsurfrules` |
-| Claude Code | `CLAUDE.md`, `.claude/hooks.json` |
+| Claude Code | `CLAUDE.md`, `.claude/settings.local.json` |
 | Antigravity | *(none)* |
 
 > Design note: Veilguard treats `init` as a **per-developer, local** setup
@@ -192,7 +192,7 @@ global, so they don't need ignoring):
   ✓ Cursor: ~/.cursor/mcp.json (global) + .cursorrules created
   ✓ VS Code: ~/Library/Application Support/Code/User/mcp.json (global) created
   ✓ Windsurf: ~/.windsurf/mcp.json (global) + .windsurfrules created
-  ✓ Claude Code: global MCP (user scope) + CLAUDE.md + .claude/hooks.json created
+  ✓ Claude Code: global MCP (user scope) + CLAUDE.md + .claude/settings.local.json hook created
   ✓ Antigravity: ~/.gemini/antigravity/mcp_config.json (global) created
   ✓ .gitignore: 5 entries added — these stay out of your repo
 
@@ -241,19 +241,22 @@ path) argument except `check_headers` (takes a `url`).
 
 | | Free (`VEILGUARD_KEY` empty) | Pro (valid key) |
 |--|------------------------------|-----------------|
-| Individual scanner tools (MCP) | Run at full depth* | Run at full depth |
-| `full_audit` grade (A+–F) | 🔒 Locked (findings shown, grade hidden) | ✅ Shown |
-| `full_audit` AI fix prompt | 🔒 Locked | ✅ Shown |
-| `full_audit` runs/month | — | **3 / month** (`PRO_AUDIT_LIMIT`) |
+| Vulnerability alerts (all scanners) | ✅ Shown | ✅ Shown |
+| Fix / solution text | 🔒 Locked (upsell shown) | ✅ Shown |
+| Breach context (`breach_precedent`) | 🔒 Locked | ✅ Shown |
+| `full_audit` (grade + AI fix prompt) | ❌ Not available — returns an upgrade prompt | ✅ Shown |
+| `full_audit` runs | — (free gets none) | ✅ Unlimited |
 | Git history deep scan (`check_git`) | Info-only upsell | ✅ Scans history |
-| `quick-scan` CLI tier | free | pro |
+| `quick-scan` / hook CLI tier | free | pro |
 
-\* In the MCP server (`server.ts`) every individual tool is invoked with
-`TIER = 'pro'`, so IDE users get full results from all 14 scanners regardless
-of key — only `full_audit`'s grade is gated. The free finding caps
-(`FREE_TIER_MAX_FINDINGS = 3`) and the "[Upgrade to Pro]" fix text only appear
-on the `free` code path (used by the CLI `quick-scan` without a key, and the
-locked audit). Keep frontend copy consistent with this.
+\* In the MCP server (`server.ts`) every tool now resolves the caller's **real
+tier** via `validateLicense()` (not a hardcoded `'pro'`). Free users get the
+**alert** for every finding, but the fix and breach lines are withheld — every
+formatter routes those through `renderFix()` in `license.ts`, which returns an
+"unlock with Pro" nudge on free and the real fix + breach on pro. `full_audit`
+is Pro-only: on free it returns an upgrade prompt (`getFullAuditMessage()`),
+never a report. The per-edit hook (`scan-hook`) applies the same gate. Keep
+frontend copy consistent with this.
 
 ---
 
@@ -270,11 +273,10 @@ The package talks to your backend. The frontend/backend must implement these.
 - Result cached locally for **24h** at `~/.veilguard/license-cache.json`.
 - Network failures fall back to (stale) cache, then to free. Validation never throws.
 
-### 8.2 Audit usage (client-side, local)
+### 8.2 Full audit access
 
-- Tracked locally at `~/.veilguard/usage.json` as `{ count, reset_date }`.
-- Limit: **3 full audits/month** (`PRO_AUDIT_LIMIT`). Resets the 1st of each month.
-- This is enforced client-side only; the backend does not currently see audit counts.
+- `full_audit` is **Pro-only and unlimited**. **Free gets no full audit** — the tool returns an upgrade prompt (`getFullAuditMessage()` in `src/license/license.ts`).
+- There is **no per-month counting** — the old `usage.json` / `PRO_AUDIT_LIMIT` tracking was removed (Pro is unlimited, free is zero).
 
 ### 8.3 Other external calls
 
@@ -292,18 +294,20 @@ From `src/utils/constants.ts` and license code:
 | OSV API | `https://api.osv.dev/v1/query` |
 | License cache TTL | 24h |
 | Free finding cap | 3 (`FREE_TIER_MAX_FINDINGS`) |
-| Pro full-audits / month | 3 (`PRO_AUDIT_LIMIT`) |
-| Local state dir | `~/.veilguard/` |
+| Full audit access | Pro = unlimited; Free = none (upgrade prompt) |
+| Local state dir | `~/.veilguard/` (license cache only) |
 
-### Known inconsistencies to reconcile (not yet fixed)
+### Tier model (canonical — code + copy aligned)
 
-These exist in the current code/copy and may not match the frontend — decide
-on the canonical value and align both sides:
-
-1. **Pricing:** the upgrade message says **$19/mo or $149/yr**, but the locked
-   full-audit report says **$15/month**. Pick one.
-2. **Scanner count wording:** README says "14 scanners" / "15 tools"; the
-   `init` closing line says "13 scanners." All are defensible (see §6) but the
-   marketing number should be consistent across site + package.
-3. **`init` free-tier line** says scanners are "depth-limited," but in MCP mode
-   they actually run at full depth (§7). Reword if you want it precise.
+1. **Pricing:** **$19/mo** or **$149/yr** everywhere. The old `$15/mo`
+   locked-report string was removed (there is no locked report anymore).
+2. **Full audit:** **Pro-only and unlimited.** Free gets none — `full_audit`
+   returns an upgrade prompt. The per-month limit / `PRO_AUDIT_LIMIT` /
+   `usage.json` tracking was removed.
+3. **Fixes & breach context:** Pro-only; free shows the alert and offers the
+   upgrade (gated by `renderFix()`).
+4. **Scanner count:** **14 scanners** (+ `full_audit` = 15 tools). `full_audit`
+   runs the 13 codebase scanners (Security Headers needs a live URL).
+5. **Free depth limits (now active):** dependency = critical CVEs only; supply
+   chain = first 20 packages; git = current files only — scanners receive the
+   caller's real tier, so the "depth-limited" framing for free is accurate.
