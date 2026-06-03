@@ -37,7 +37,11 @@ export const HTTP_TIMEOUT_MS = 5000;
 export const POLAR_API_URL = 'https://api.polar.sh/v1/customer-portal/license-keys/validate';
 export const POLAR_SANDBOX_API_URL =
   'https://sandbox-api.polar.sh/v1/customer-portal/license-keys/validate';
-export const POLAR_ORG_ID = process.env.POLAR_ORG_ID || '';
+// Baked-in org id so end users never have to provide it — they only set
+// VEILGUARD_KEY. Env var stays as an override for testing.
+// TODO: before publishing to npm, swap this default to the PRODUCTION org id
+// (the value below is the sandbox org id, used while testing).
+export const POLAR_ORG_ID = process.env.POLAR_ORG_ID || '584fa9eb-8905-43fa-8dfb-332ecc6037f7';
 export const USE_POLAR_SANDBOX = process.env.VEILGUARD_SANDBOX === 'true';
 
 // ── License cache ─────────────────────────────────────────────────────────────
