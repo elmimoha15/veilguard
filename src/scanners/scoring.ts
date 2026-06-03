@@ -74,16 +74,18 @@ export function calculateScore(findings: Finding[]): { score: number; grade: str
     }
 
     const rule = SCORE_RULES.find((r) => r.match(f));
-    if (rule) {
-      score -= rule.penalty;
-      continue;
-    }
+    const basePenalty = rule ? rule.penalty : f.severity === 'critical' ? 15 : 5;
 
-    // Severity-based fallback for any uncategorized finding.
-    score -= f.severity === 'critical' ? 15 : 5;
+    // Scale by the scanner's confidence that this is a real, exploitable issue.
+    // Findings without a confidence (most scanners, and all that weren't context-
+    // classified) are treated as fully confident (1), preserving prior behaviour.
+    // A contextual / lower-confidence finding costs proportionally less, so a
+    // clean docs site can't be dragged to an F by ambiguous matches.
+    const confidence = typeof f.confidence === 'number' ? f.confidence : 1;
+    score -= basePenalty * confidence;
   }
 
-  score = Math.max(0, score);
+  score = Math.max(0, Math.round(score));
   const grade = scoreToGrade(score);
   return { score, grade };
 }

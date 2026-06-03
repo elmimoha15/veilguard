@@ -13,6 +13,12 @@ export interface Finding {
   docs?: string;
   cwe?: string;
   breach_precedent?: string;
+  /**
+   * 0..1 — how confident the scanner is that this is a real, exploitable issue
+   * (vs. a match inside a comment, string literal, doc, or example). Absent means
+   * "not context-classified" and is treated as full confidence (1) by the scorer.
+   */
+  confidence?: number;
 }
 
 export interface ScanResult {

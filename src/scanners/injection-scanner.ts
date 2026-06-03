@@ -6,7 +6,19 @@ import { logger } from '../utils/logger.js';
 import { getPatternsDir } from '../utils/paths.js';
 import { FREE_TIER_MAX_FINDINGS } from '../utils/constants.js';
 import { getUpgradeMessage } from '../license/license.js';
+import { vetMatch } from '../utils/match-context.js';
 import type { Finding, ScanResult, InjectionPattern, Tier } from '../types.js';
+
+// dangerouslySetInnerHTML fed JSON-LD / JSON.stringify(...) is static, controlled
+// content (a very common SEO pattern), not user-driven XSS. Down-rank it.
+function isControlledHtmlSink(line: string, content: string, lineIndex: number): boolean {
+  const window = [line, content.split('\n').slice(lineIndex, lineIndex + 3).join('\n')].join('\n');
+  return (
+    /__html\s*:\s*JSON\.stringify/.test(window) ||
+    /application\/ld\+json/i.test(content) ||
+    /__html\s*:\s*`?\s*\$\{?\s*JSON\.stringify/.test(window)
+  );
+}
 
 let rulesCache: InjectionPattern[] | null = null;
 
@@ -26,6 +38,7 @@ async function loadRules(): Promise<InjectionPattern[]> {
 async function scanFileForInjection(
   filePath: string,
   rules: InjectionPattern[],
+  rootDir: string,
 ): Promise<Finding[]> {
   const content = await readFileSafe(filePath);
   if (!content) return [];
@@ -38,10 +51,21 @@ async function scanFileForInjection(
       const regex = new RegExp(rule.pattern, 'gi');
 
       for (let i = 0; i < lines.length; i++) {
-        if (regex.test(lines[i])) {
-          findings.push({
+        regex.lastIndex = 0;
+        const m = regex.exec(lines[i]);
+        if (!m) continue;
+
+        // JSON-LD / JSON.stringify into dangerouslySetInnerHTML is static and
+        // controlled — at most informational, never a blocking critical.
+        let severity = rule.severity;
+        if (rule.id === 'xss-dangerously-set' && isControlledHtmlSink(lines[i], content, i)) {
+          severity = 'info';
+        }
+
+        const vetted = vetMatch(
+          {
             id: `injection-${rule.id}`,
-            severity: rule.severity,
+            severity,
             category: 'injection',
             title: rule.name,
             message: `${rule.name} detected in ${filePath}:${i + 1}`,
@@ -50,10 +74,22 @@ async function scanFileForInjection(
             fix: rule.fix,
             cwe: rule.cwe,
             breach_precedent: rule.breach_precedent,
-          });
+          },
+          {
+            filePath,
+            content,
+            lineIndex: i,
+            column: m.index,
+            matchText: m[0],
+            rootDir,
+            mode: 'code-construct',
+          },
+        );
+
+        if (vetted) {
+          findings.push(vetted);
           break; // One finding per rule per file
         }
-        regex.lastIndex = 0;
       }
     } catch {
       logger.debug(`Invalid injection regex: ${rule.id}`);
@@ -70,7 +106,7 @@ export async function scanInjection(directory: string, _tier: Tier): Promise<Sca
 
   const allFindings: Finding[] = [];
   for (const file of files) {
-    const findings = await scanFileForInjection(file, rules);
+    const findings = await scanFileForInjection(file, rules, directory);
     allFindings.push(...findings);
   }
 

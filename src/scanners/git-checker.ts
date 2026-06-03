@@ -2,6 +2,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 import { readFileSafe } from '../utils/file-reader.js';
 import { renderFix } from '../license/license.js';
+import { gitignoreCovers } from '../utils/match-context.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 function isGitRepo(directory: string): boolean {
@@ -22,9 +23,12 @@ function gitLsFiles(directory: string, file: string): boolean {
   }
 }
 
-function searchGitHistory(directory: string, pattern: string): boolean {
+// Search history for an actual key, not just a prefix. Using -G with an extended
+// regex requiring the random suffix means a bare "sk_live_" mentioned in commited
+// marketing copy or docs no longer counts as a leaked secret.
+function searchGitHistory(directory: string, regex: string): boolean {
   try {
-    const result = execSync(`git log --all --oneline -S "${pattern}" -1`, {
+    const result = execSync(`git log --all --oneline -E -G "${regex}" -1`, {
       cwd: directory,
       encoding: 'utf-8',
       stdio: 'pipe',
@@ -63,10 +67,10 @@ export async function checkGit(directory: string, tier: Tier): Promise<ScanResul
       fix: 'Create a .gitignore with at least: .env, .env.local, .env.production, node_modules/, dist/, .next/',
     });
   } else {
-    // Check for .env in .gitignore
+    // Check for .env in .gitignore (glob-aware: `.env*` covers all of these).
     const envPatterns = ['.env', '.env.local', '.env.production'];
     for (const pattern of envPatterns) {
-      if (!gitignoreContent.includes(pattern)) {
+      if (!gitignoreCovers(gitignoreContent, pattern)) {
         findings.push({
           id: `git-gitignore-missing-${pattern}`,
           severity: 'warning',
@@ -104,17 +108,25 @@ export async function checkGit(directory: string, tier: Tier): Promise<ScanResul
     });
   }
 
-  // Pro: deep scan git history for secrets
+  // Pro: deep scan git history for secrets. Each entry is a {label, regex} where
+  // the regex requires the full key shape (prefix + random suffix), so a bare
+  // prefix in prose/docs is not mistaken for a leaked credential.
   if (tier === 'pro') {
-    const secretPatterns = ['sk_live_', 'sk_test_', 'AKIA', 'FLWSECK_', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'];
-    for (const pattern of secretPatterns) {
-      if (searchGitHistory(directory, pattern)) {
+    const secretPatterns: Array<{ label: string; regex: string }> = [
+      { label: 'sk_live_', regex: 'sk_live_[A-Za-z0-9]{20,}' },
+      { label: 'sk_test_', regex: 'sk_test_[A-Za-z0-9]{20,}' },
+      { label: 'AKIA (AWS key)', regex: 'AKIA[0-9A-Z]{16}' },
+      { label: 'FLWSECK', regex: 'FLWSECK[_-][A-Za-z0-9]{12,}' },
+      { label: 'Supabase JWT', regex: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\.[A-Za-z0-9_-]{30,}' },
+    ];
+    for (const { label, regex } of secretPatterns) {
+      if (searchGitHistory(directory, regex)) {
         findings.push({
-          id: `git-history-secret-${pattern.replace(/[^a-zA-Z0-9]/g, '')}`,
+          id: `git-history-secret-${label.replace(/[^a-zA-Z0-9]/g, '')}`,
           severity: 'critical',
           category: 'git',
-          title: `Secret found in git history: ${pattern}...`,
-          message: `Pattern "${pattern}" appears in git commit history. Even if deleted from current files, it persists in history.`,
+          title: `Secret found in git history: ${label}...`,
+          message: `A ${label} key appears in git commit history. Even if deleted from current files, it persists in history.`,
           fix: `Use BFG Repo-Cleaner to purge: bfg --replace-text secrets.txt. Then rotate the compromised credential.`,
           cwe: 'CWE-538',
           breach_precedent: 'GitGuardian 2026: 1.27M secrets tied to AI-generated commits.',

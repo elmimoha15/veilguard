@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import { readFileSafe } from '../utils/file-reader.js';
 import { scanDirectory } from '../utils/glob-scanner.js';
 import { renderFix } from '../license/license.js';
+import { gitignoreCovers, vetMatch } from '../utils/match-context.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 async function fileExists(path: string): Promise<boolean> {
@@ -15,10 +16,12 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function gitignoreContains(rootDir: string, pattern: string): Promise<boolean> {
+// Glob-aware: a .gitignore entry of `.env*` correctly covers `.env.local`,
+// `.env.production`, etc., so we don't report a covered file as "not ignored".
+async function gitignoreContains(rootDir: string, fileName: string): Promise<boolean> {
   try {
     const content = await readFile(join(rootDir, '.gitignore'), 'utf-8');
-    return content.split('\n').some((line) => line.trim() === pattern || line.trim() === pattern + '/');
+    return gitignoreCovers(content, fileName);
   } catch {
     return false;
   }
@@ -54,7 +57,7 @@ async function checkNextPublicVars(directory: string): Promise<Finding[]> {
       if (match) {
         const varName = match[1];
         if (secretKeywords.some((kw) => varName.toUpperCase().includes(kw))) {
-          findings.push({
+          const finding: Finding = {
             id: 'env-next-public-secret',
             severity: 'critical',
             category: 'env',
@@ -65,7 +68,22 @@ async function checkNextPublicVars(directory: string): Promise<Finding[]> {
             fix: `Remove the NEXT_PUBLIC_ prefix. Use a server-side API route to access this value.`,
             cwe: 'CWE-200',
             breach_precedent: 'v0 scanner blocked 17,000+ deployments where AI exposed secrets via NEXT_PUBLIC_ prefix.',
+          };
+          // A real exposure is the var referenced in executable code (process.env
+          // .NEXT_PUBLIC_… or a .env definition). The same identifier inside a
+          // string literal, comment, JSX text, or docs is describing the risk, not
+          // creating it — code-construct mode suppresses those.
+          const vetted = vetMatch(finding, {
+            filePath: file,
+            content,
+            lineIndex: i,
+            column: match.index,
+            matchText: match[0],
+            lineText: line,
+            rootDir: directory,
+            mode: 'code-construct',
           });
+          if (vetted) findings.push(vetted);
         }
       }
     }

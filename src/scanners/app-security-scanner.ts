@@ -5,6 +5,7 @@ import { readFileSafe } from '../utils/file-reader.js';
 import { logger } from '../utils/logger.js';
 import { getPatternsDir } from '../utils/paths.js';
 import { renderFix } from '../license/license.js';
+import { isDocFile, isTestOrExampleFile } from '../utils/match-context.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 interface AuthRule {
@@ -393,7 +394,9 @@ export async function scanAppSecurity(directory: string, _tier: Tier): Promise<S
   const findings: Finding[] = [];
 
   for (const file of files) {
-    if (isTestFile(file)) continue;
+    // App-layer findings require real, reachable handler code — never docs,
+    // tests, fixtures, or example directories.
+    if (isTestFile(file) || isDocFile(file) || isTestOrExampleFile(file, directory)) continue;
     const content = await readFileSafe(file);
     if (!content) continue;
 

@@ -6,7 +6,58 @@ import { logger } from '../utils/logger.js';
 import { getPatternsDir } from '../utils/paths.js';
 import { FREE_TIER_MAX_FINDINGS } from '../utils/constants.js';
 import { getUpgradeMessage } from '../license/license.js';
+import { classifyMatch, vetMatch } from '../utils/match-context.js';
 import type { Finding, ScanResult, WebhookRule, Tier } from '../types.js';
+
+// A webhook finding is only credible inside code that actually receives requests.
+// SEO/marketing copy that merely *names* providers ("Webhook verification for
+// Stripe, Paystack, …") lives in components with no handler and must be ignored.
+function looksLikeServerHandler(filePath: string, content: string): boolean {
+  const p = filePath.toLowerCase();
+  if (
+    p.includes('/api/') ||
+    p.includes('/server/') ||
+    p.includes('/routes/') ||
+    p.includes('/handlers/') ||
+    p.includes('/functions/') ||
+    p.includes('/pages/api/') ||
+    /route\.[cm]?[tj]s$/.test(p)
+  ) {
+    return true;
+  }
+  return (
+    /\b(app|router)\.(post|put|patch|get|delete|use)\s*\(/.test(content) ||
+    /export\s+(async\s+)?function\s+(POST|PUT|PATCH|GET|DELETE)\s*\(/.test(content) ||
+    /export\s+const\s+(POST|PUT|PATCH|GET|DELETE)\s*=/.test(content) ||
+    /exports\.handler\b/.test(content) ||
+    /addEventListener\s*\(\s*['"`]fetch['"`]/.test(content) ||
+    /\.on\s*\(\s*['"`]request['"`]/.test(content)
+  );
+}
+
+// Drop matches that sit in prose, comments, JSX text, docs, or fixtures — but
+// keep ordinary string literals (a webhook route path is legitimately a string).
+function endpointMatchIsReal(
+  filePath: string,
+  content: string,
+  lineIndex: number,
+  column: number,
+  matchText: string,
+  rootDir: string,
+): boolean {
+  const c = classifyMatch({
+    filePath,
+    content,
+    lineIndex,
+    column,
+    matchText,
+    rootDir,
+    mode: 'code-construct',
+  });
+  if (c.kind === 'doc-file' || c.kind === 'test-fixture') return false;
+  if (c.kind === 'comment' || c.kind === 'jsx-text') return false;
+  return !c.isProse;
+}
 
 let rulesCache: WebhookRule[] | null = null;
 
@@ -87,13 +138,18 @@ function checkMissingFailureHandlers(filePath: string, content: string): Finding
 async function scanFileForWebhooks(
   filePath: string,
   rules: WebhookRule[],
+  rootDir: string,
 ): Promise<Finding[]> {
   const content = await readFileSafe(filePath);
   if (!content) return [];
 
+  // Only real request-handling code can host a webhook bug. This single gate
+  // removes the entire class of "marketing copy names a provider" false positives.
+  if (!looksLikeServerHandler(filePath, content)) return [];
+
   const findings: Finding[] = [];
   const lines = content.split('\n');
-  
+
   // Check for missing failure handlers (GAP 2)
   findings.push(...checkMissingFailureHandlers(filePath, content));
 
@@ -102,43 +158,50 @@ async function scanFileForWebhooks(
       const regex = new RegExp(endpointPattern, 'i');
 
       for (let i = 0; i < lines.length; i++) {
-        if (regex.test(lines[i])) {
-          // Found a webhook endpoint — check if the file has verification
-          if (!hasVerification(content, rule.required_verification)) {
-            findings.push({
-              id: `webhook-unverified-${rule.provider}`,
-              severity: rule.severity,
-              category: 'webhook',
-              title: `Unverified ${rule.provider} webhook`,
-              message: `${rule.provider} webhook endpoint at ${filePath}:${i + 1} is missing signature verification.`,
-              file: filePath,
-              line: i + 1,
-              fix: rule.fix,
-              cwe: 'CWE-345',
-              breach_precedent: rule.breach_precedent,
-            });
-          }
-          break; // Only flag once per rule per file
+        const m = regex.exec(lines[i]);
+        if (!m) continue;
+        if (!endpointMatchIsReal(filePath, content, i, m.index, m[0], rootDir)) break;
+        // Found a real webhook endpoint — check if the file has verification
+        if (!hasVerification(content, rule.required_verification)) {
+          findings.push({
+            id: `webhook-unverified-${rule.provider}`,
+            severity: rule.severity,
+            category: 'webhook',
+            title: `Unverified ${rule.provider} webhook`,
+            message: `${rule.provider} webhook endpoint at ${filePath}:${i + 1} is missing signature verification.`,
+            file: filePath,
+            line: i + 1,
+            fix: rule.fix,
+            cwe: 'CWE-345',
+            breach_precedent: rule.breach_precedent,
+            confidence: 0.9,
+          });
         }
+        break; // Only flag once per rule per file
       }
     }
 
     // Check for exec/eval in webhook handlers (command injection)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (/webhook/i.test(content) && /\b(exec|execSync|eval)\s*\(/.test(line)) {
-        findings.push({
-          id: 'webhook-command-injection',
-          severity: 'critical',
-          category: 'webhook',
-          title: 'Command injection in webhook handler',
-          message: `exec/eval called inside webhook handler at ${filePath}:${i + 1}. Attackers can inject commands via webhook payload.`,
-          file: filePath,
-          line: i + 1,
-          fix: 'Never pass webhook payload data to exec/eval. Use a whitelist of allowed actions.',
-          cwe: 'CWE-78',
-          breach_precedent: 'CurXecute-style attacks: unverified webhooks allow arbitrary command execution.',
-        });
+      const m = /\b(exec|execSync|eval)\s*\(/.exec(line);
+      if (/webhook/i.test(content) && m) {
+        const vetted = vetMatch(
+          {
+            id: 'webhook-command-injection',
+            severity: 'critical',
+            category: 'webhook',
+            title: 'Command injection in webhook handler',
+            message: `exec/eval called inside webhook handler at ${filePath}:${i + 1}. Attackers can inject commands via webhook payload.`,
+            file: filePath,
+            line: i + 1,
+            fix: 'Never pass webhook payload data to exec/eval. Use a whitelist of allowed actions.',
+            cwe: 'CWE-78',
+            breach_precedent: 'CurXecute-style attacks: unverified webhooks allow arbitrary command execution.',
+          },
+          { filePath, content, lineIndex: i, column: m.index, matchText: m[0], rootDir, mode: 'code-construct' },
+        );
+        if (vetted) findings.push(vetted);
       }
     }
   }
@@ -153,7 +216,7 @@ export async function scanWebhooks(directory: string, _tier: Tier): Promise<Scan
 
   const allFindings: Finding[] = [];
   for (const file of files) {
-    const findings = await scanFileForWebhooks(file, rules);
+    const findings = await scanFileForWebhooks(file, rules, directory);
     allFindings.push(...findings);
   }
 
