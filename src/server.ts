@@ -1,6 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { validateLicense, getFullAuditMessage } from './license/license.js';
+import {
+  getFullAuditMessage,
+  getAuditLimitMessage,
+  canRunAudit,
+  recordAuditUsage,
+} from './license/license.js';
 import { scanSecrets, formatSecretResults } from './scanners/secret-scanner.js';
 import { checkEnv, formatEnvResults } from './scanners/env-checker.js';
 import { scanWebhooks, formatWebhookResults } from './scanners/webhook-scanner.js';
@@ -122,7 +127,10 @@ const DIR_TOOLS: Array<{
   },
 ];
 
-export function createServer(): McpServer {
+// The session tier is resolved once at startup (in index.ts) and passed in here,
+// so we validate against Polar a single time per server lifetime rather than on
+// every scan.
+export function createServer(tier: Tier): McpServer {
   const server = new McpServer({
     name: 'veilguard',
     version: '0.3.0',
@@ -130,7 +138,6 @@ export function createServer(): McpServer {
 
   for (const tool of DIR_TOOLS) {
     server.tool(tool.name, tool.description, DIR_ARG, async ({ directory }) => {
-      const { tier } = await validateLicense();
       const result = await tool.scanner(directory, tier);
       return { content: [{ type: 'text', text: tool.formatter(result, tier) }] };
     });
@@ -141,7 +148,6 @@ export function createServer(): McpServer {
     'Verify security headers (CSP, HSTS, X-Frame-Options, etc.) on a deployed URL.',
     { url: z.string().url().describe('The deployed URL to check (e.g. https://myapp.vercel.app)') },
     async ({ url }) => {
-      const { tier } = await validateLicense();
       const result = await checkHeaders(url, tier);
       return { content: [{ type: 'text', text: formatHeaderResults(result, tier) }] };
     },
@@ -152,15 +158,19 @@ export function createServer(): McpServer {
     'Run all security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Pro only — unlimited. Free users get an upgrade prompt (no audit).',
     { directory: z.string().describe('Absolute path to the project root directory') },
     async ({ directory }) => {
-      const { tier } = await validateLicense();
-
       // Full audit is Pro-only. Free gets no audit at all — just the upsell.
       if (tier !== 'pro') {
         return { content: [{ type: 'text', text: getFullAuditMessage() }] };
       }
 
-      // Pro: unlimited full audits, with grade + AI-ready fix prompt.
+      // Pro gets a generous monthly allotment of full audits. Once it's used up,
+      // show the limit message instead of running the (expensive) full scan.
+      if (!(await canRunAudit())) {
+        return { content: [{ type: 'text', text: getAuditLimitMessage() }] };
+      }
+
       const report = await runAllScanners(directory, tier);
+      await recordAuditUsage();
       return { content: [{ type: 'text', text: formatAuditReport(report) }] };
     },
   );

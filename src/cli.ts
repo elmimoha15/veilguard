@@ -14,17 +14,17 @@ import { analyzeFirebase } from './scanners/firebase-analyzer.js';
 import { checkSupplyChain } from './scanners/supply-chain-checker.js';
 import { scanDependencies } from './scanners/dependency-checker.js';
 import { scanRulesFiles } from './scanners/rules-file-scanner.js';
-import { validateLicense } from './license/license.js';
+import { getTier } from './license/license.js';
 import type { Finding, ScanResult, Tier } from './types.js';
 
 function getCommand(): string {
   return process.argv[2] || 'start';
 }
 
-// Resolve the caller's real tier (validates VEILGUARD_KEY, cached 24h, never
-// throws). Used to gate whether the hook/quick-scan reveals fixes.
+// Resolve the caller's real tier (validates VEILGUARD_KEY against Polar, cached
+// 24h, never throws). Used to gate whether the hook/quick-scan reveals fixes.
 async function resolveTier(): Promise<Tier> {
-  return (await validateLicense()).tier;
+  return getTier();
 }
 
 const SOURCE_EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
