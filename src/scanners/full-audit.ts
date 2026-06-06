@@ -288,14 +288,20 @@ export function formatAuditReport(report: AuditReport): string {
   lines.push(gradeMeaning(report.grade));
   lines.push('');
 
-  // AI Fix Prompt (only when there is something to fix)
+  // Fix-it prompt (only when there is something to fix). Veilguard does NOT edit
+  // the user's code — it hands them a ready-to-paste prompt so they stay in
+  // control and run the fix through their own AI assistant.
   if (total > 0) {
     lines.push(DIVIDER);
-    lines.push('🔧 AI Fix Prompt');
+    lines.push('🔧 How to fix all of this');
     lines.push(DIVIDER);
-    lines.push('Copy and paste this into your AI agent to fix everything at once:');
+    lines.push("Veilguard won't touch your code — you stay in control.");
+    lines.push('To fix everything, copy the prompt below and paste it to your AI');
+    lines.push('coding assistant (Cursor, Claude, Windsurf, Lovable, etc.).');
     lines.push('');
+    lines.push('┌─ copy everything between the lines ──────────────────────────');
     lines.push(report.fix_prompt);
+    lines.push('└─────────────────────────────────────────────────────────────');
     lines.push('');
   }
 

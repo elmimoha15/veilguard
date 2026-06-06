@@ -63,5 +63,61 @@
     "category": "auth",
     "fix": "Never assign window.location from untrusted query strings without an allowlist.",
     "cwe": "CWE-601"
+  },
+  {
+    "id": "jwt-hardcoded-secret",
+    "name": "Hardcoded JWT signing secret",
+    "pattern": "jwt\\.sign\\s*\\([^,]+,\\s*['\"`][^'\"`,)]{6,}['\"`]",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Never hardcode the JWT secret. Load it from process.env.JWT_SECRET and use a long random value.",
+    "cwe": "CWE-798",
+    "breach_precedent": "A hardcoded JWT secret lets anyone forge valid tokens and log in as any user."
+  },
+  {
+    "id": "jwt-alg-none",
+    "name": "JWT 'none' algorithm allowed",
+    "pattern": "algorithms?\\s*:\\s*\\[?\\s*['\"]none['\"]",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Never allow the 'none' algorithm. Pin a strong one: jwt.verify(token, secret, { algorithms: ['HS256'] }).",
+    "cwe": "CWE-347",
+    "breach_precedent": "The JWT 'none' algorithm bypass lets attackers submit unsigned tokens that are accepted as valid."
+  },
+  {
+    "id": "tls-reject-unauthorized-false",
+    "name": "TLS certificate validation disabled",
+    "pattern": "rejectUnauthorized\\s*:\\s*false",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Remove rejectUnauthorized: false — it disables TLS checks and enables man-in-the-middle attacks. Use a proper CA certificate.",
+    "cwe": "CWE-295"
+  },
+  {
+    "id": "tls-node-reject-disabled",
+    "name": "Node TLS verification globally disabled",
+    "pattern": "NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*['\"]?0",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Remove NODE_TLS_REJECT_UNAUTHORIZED=0 — it turns off certificate validation for the entire app.",
+    "cwe": "CWE-295"
+  },
+  {
+    "id": "cookie-not-httponly",
+    "name": "Auth cookie missing HttpOnly",
+    "pattern": "httpOnly\\s*:\\s*false",
+    "severity": "warning",
+    "category": "auth",
+    "fix": "Set httpOnly: true on session/auth cookies so JavaScript (and any XSS) can't read them.",
+    "cwe": "CWE-1004"
+  },
+  {
+    "id": "insecure-random-token",
+    "name": "Insecure randomness for a security token",
+    "pattern": "(token|secret|apikey|api_key|sessionid|session_id|otp|nonce|reset|verification)\\w*\\s*[:=][^;\\n]*Math\\.random\\s*\\(",
+    "severity": "critical",
+    "category": "auth",
+    "fix": "Math.random() is predictable. Use crypto.randomBytes(32).toString('hex') or crypto.randomUUID() for tokens, codes, and secrets.",
+    "cwe": "CWE-338"
   }
 ]

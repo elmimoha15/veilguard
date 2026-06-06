@@ -134,24 +134,32 @@ export function summarizeFindings(findings: Finding[]): {
   };
 }
 
+// Builds the prompt the user copies and pastes into their own AI coding
+// assistant. Veilguard never edits the user's code — it hands them this prompt
+// instead. Written in plain language for non-technical "vibe coders".
 export function generateFixPrompt(scans: ScanResult[]): string {
   const allFindings = scans.flatMap((s) => s.findings).filter((f) => f.severity === 'critical' || f.severity === 'warning');
 
   if (allFindings.length === 0) return 'No fixes needed — your project is clean!';
 
   const lines: string[] = [
-    'Fix the following security issues in my project:',
+    'I ran a security scan on my app and it found some issues. Please fix each one for me — carefully, and without breaking anything that already works.',
+    '',
+    'Here is what is wrong and where. The "suggested direction" is just a hint —',
+    'use your own understanding of my codebase to apply the best real fix, not a copy-paste:',
     '',
   ];
 
   for (let i = 0; i < allFindings.length; i++) {
     const f = allFindings[i];
-    lines.push(`${i + 1}. [${f.severity.toUpperCase()}] ${f.title}`);
-    if (f.file) lines.push(`   File: ${f.file}${f.line ? `:${f.line}` : ''}`);
-    if (f.fix) lines.push(`   Fix: ${f.fix}`);
+    lines.push(`${i + 1}. ${f.title}`);
+    if (f.file) lines.push(`   Where: ${f.file}${f.line ? `:${f.line}` : ''}`);
+    if (f.fix) lines.push(`   Suggested direction: ${f.fix}`);
     lines.push('');
   }
 
-  lines.push('Apply all fixes while maintaining existing functionality. Do not break any working features.');
+  lines.push(
+    "Please make these changes one at a time using your own judgment. After each fix, double-check it didn't break any feature that already works. When you're done, explain in plain, non-technical language what you changed and why my app is now safer.",
+  );
   return lines.join('\n');
 }

@@ -1,12 +1,18 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { createHash } from 'crypto';
+import { readFile, writeFile, mkdir, rm } from 'fs/promises';
+import { createHash, randomUUID } from 'crypto';
 import {
   VEILGUARD_HOME,
   LICENSE_CACHE_PATH,
   AUDIT_USAGE_PATH,
+  ACTIVATION_PATH,
+  MACHINE_ID_PATH,
   LICENSE_CACHE_TTL_MS,
   POLAR_API_URL,
   POLAR_SANDBOX_API_URL,
+  POLAR_ACTIVATE_URL,
+  POLAR_SANDBOX_ACTIVATE_URL,
+  POLAR_DEACTIVATE_URL,
+  POLAR_SANDBOX_DEACTIVATE_URL,
   POLAR_ORG_ID,
   USE_POLAR_SANDBOX,
   PRO_MONTHLY_AUDIT_LIMIT,
@@ -27,6 +33,18 @@ import type { Tier, Finding } from '../types.js';
 //   4. Polar says anything else       → free  (cache it — key is invalid)
 //   5. Polar unreachable / timeout    → stale cache if we have one, else free
 //
+// Anti-sharing: the Polar License Key benefit MUST have "Limit activations" set.
+// Each machine claims one activation slot on first validation (bound to a stable
+// machine id stored in ~/.veilguard). Subsequent runs reuse that activation id, so
+// a key shared beyond the limit can't activate the extra machines → they get free.
+//
+// IMPORTANT (Polar API contract): the /activate endpoint returns HTTP 403 with an
+// identical message — "License key activation not supported or limit reached" —
+// whether the limit was hit OR the benefit simply has no activation limit set. The
+// two are indistinguishable, so we fail closed: any 403 → free. Practical upshot:
+// if "Limit activations" is NOT configured on the benefit, EVERY machine gets 403
+// and therefore free. Configure the activation limit, or no one gets Pro.
+//
 // The resolved tier is memoized for the lifetime of the process, so a long-lived
 // MCP server validates once at startup and reuses the result for every scan.
 // ──────────────────────────────────────────────────────────────────────────────
@@ -45,6 +63,12 @@ interface LicenseCache {
 interface AuditUsage {
   count: number;
   month: string;
+}
+
+// The activation slot Polar issued for this machine, tied to the current key.
+interface ActivationRecord {
+  key_hash: string;
+  activation_id: string;
 }
 
 // Resolved once per process. `undefined` = not yet resolved.
@@ -132,6 +156,58 @@ function isFresh(cache: LicenseCache): boolean {
   return Number.isFinite(expires) && Date.now() < expires;
 }
 
+// ── machine id + activation record ────────────────────────────────────────────────
+
+// A stable, random per-machine id, persisted once to ~/.veilguard/machine-id. It
+// is opaque (a random UUID — no hardware/PII) and only used to label this machine's
+// activation slot in Polar. Falls back to an ephemeral id if it can't be persisted.
+async function getMachineId(): Promise<string> {
+  try {
+    const existing = (await readFile(MACHINE_ID_PATH, 'utf-8')).trim();
+    if (existing) return existing;
+  } catch {
+    // Not created yet — fall through and create it.
+  }
+  const id = randomUUID();
+  if (await ensureHome()) {
+    try {
+      await writeFile(MACHINE_ID_PATH, id);
+    } catch (error) {
+      logger.warn(`License validation: failed to persist machine id (${(error as Error).message})`);
+    }
+  }
+  return id;
+}
+
+async function readActivation(): Promise<ActivationRecord | null> {
+  try {
+    const parsed = JSON.parse(await readFile(ACTIVATION_PATH, 'utf-8')) as Partial<ActivationRecord>;
+    if (typeof parsed.key_hash === 'string' && typeof parsed.activation_id === 'string') {
+      return parsed as ActivationRecord;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeActivation(record: ActivationRecord): Promise<void> {
+  if (!(await ensureHome())) return;
+  try {
+    await writeFile(ACTIVATION_PATH, JSON.stringify(record, null, 2));
+  } catch (error) {
+    logger.warn(`License validation: failed to write activation (${(error as Error).message})`);
+  }
+}
+
+async function clearActivation(): Promise<void> {
+  try {
+    await rm(ACTIVATION_PATH, { force: true });
+  } catch {
+    // Best effort — a leftover record is harmless (it just re-validates).
+  }
+}
+
 // ── Polar validation ────────────────────────────────────────────────────────────
 
 type PolarOutcome =
@@ -145,9 +221,11 @@ interface PolarResponse {
 
 // Calls Polar's validate endpoint. Distinguishes three outcomes:
 //   • granted     — 200 + status "granted"/"active" → user is Pro
-//   • invalid     — any other HTTP response (404/403/etc.) → key is not valid
+//   • invalid     — any other HTTP response (404/403/422/etc.) → key/activation not valid
 //   • unreachable — timeout, network error, or unparseable body → unknown
-async function validateWithPolar(key: string): Promise<PolarOutcome> {
+// When `activationId` is supplied it is sent too, so Polar checks the key is still
+// valid AND that this machine's activation slot is still live.
+async function validateWithPolar(key: string, activationId?: string): Promise<PolarOutcome> {
   const url = USE_POLAR_SANDBOX ? POLAR_SANDBOX_API_URL : POLAR_API_URL;
   logger.debug(
     `License validation: calling Polar API (${USE_POLAR_SANDBOX ? 'sandbox' : 'production'})...`,
@@ -157,11 +235,14 @@ async function validateWithPolar(key: string): Promise<PolarOutcome> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POLAR_TIMEOUT_MS);
 
+  const payload: Record<string, unknown> = { key, organization_id: POLAR_ORG_ID };
+  if (activationId) payload.activation_id = activationId;
+
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, organization_id: POLAR_ORG_ID }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
@@ -196,7 +277,127 @@ async function validateWithPolar(key: string): Promise<PolarOutcome> {
   }
 }
 
+// ── Polar activation ────────────────────────────────────────────────────────────
+
+type ActivateOutcome =
+  | { kind: 'activated'; activationId: string }
+  | { kind: 'limit_reached' } // 403: limit hit OR activations not enabled (Polar can't distinguish)
+  | { kind: 'invalid' } //        404 bad key / 422 malformed / other
+  | { kind: 'unreachable' };
+
+// Claims an activation slot for this machine. Polar caps the number of slots at
+// the benefit's "Limit activations" value, so the (limit+1)-th machine is rejected.
+async function activateWithPolar(key: string, machineId: string): Promise<ActivateOutcome> {
+  const url = USE_POLAR_SANDBOX ? POLAR_SANDBOX_ACTIVATE_URL : POLAR_ACTIVATE_URL;
+  logger.debug('License validation: activating this machine with Polar...');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), POLAR_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key,
+        organization_id: POLAR_ORG_ID,
+        label: `veilguard-${machineId.slice(0, 8)}`,
+        meta: { machine_id: machineId, source: 'veilguard-mcp' },
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.ok) {
+      let body: { id?: string };
+      try {
+        body = (await response.json()) as { id?: string };
+      } catch {
+        return { kind: 'unreachable' };
+      }
+      if (typeof body.id === 'string' && body.id.length > 0) {
+        logger.debug('License validation: machine activated');
+        return { kind: 'activated', activationId: body.id };
+      }
+      return { kind: 'unreachable' };
+    }
+
+    // Polar returns 403 with one ambiguous message for BOTH "limit reached" and
+    // "activations not enabled on this benefit". We require activations, so a 403
+    // means this machine can't claim a slot → no Pro (fail closed).
+    if (response.status === 403) {
+      logger.warn('License validation: activation refused (limit reached, or activations not enabled on the benefit)');
+      return { kind: 'limit_reached' };
+    }
+    logger.debug(`License validation: activate returned HTTP ${response.status}`);
+    return { kind: 'invalid' };
+  } catch (error) {
+    const name = (error as Error).name;
+    const reason = name === 'AbortError' ? `timeout after ${POLAR_TIMEOUT_MS}ms` : (error as Error).message;
+    logger.debug(`License validation: activate unreachable (${reason})`);
+    return { kind: 'unreachable' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Releases this machine's activation slot. Best effort — never throws.
+async function deactivateWithPolar(key: string, activationId: string): Promise<boolean> {
+  const url = USE_POLAR_SANDBOX ? POLAR_SANDBOX_DEACTIVATE_URL : POLAR_DEACTIVATE_URL;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), POLAR_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, organization_id: POLAR_ORG_ID, activation_id: activationId }),
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── tier resolution ──────────────────────────────────────────────────────────────
+
+type TierOutcome =
+  | { kind: 'granted' }
+  | { kind: 'invalid' }
+  | { kind: 'limit' } // activation limit hit — key is on too many machines
+  | { kind: 'unreachable' };
+
+// Resolve against Polar, binding this machine to an activation slot when the
+// benefit enforces a limit, and falling back to plain validation when it doesn't.
+async function resolveAgainstPolar(key: string, keyHash: string): Promise<TierOutcome> {
+  // (a) Reuse this machine's existing activation for this key, if we have one.
+  const stored = await readActivation();
+  if (stored && stored.key_hash === keyHash) {
+    const v = await validateWithPolar(key, stored.activation_id);
+    if (v.kind === 'granted') return { kind: 'granted' };
+    if (v.kind === 'unreachable') return { kind: 'unreachable' };
+    // The stored activation was revoked/removed server-side — drop it, re-activate.
+    logger.debug('License validation: stored activation no longer valid, re-activating');
+    await clearActivation();
+  }
+
+  // (b) Claim a fresh activation slot for this machine.
+  const machineId = await getMachineId();
+  const act = await activateWithPolar(key, machineId);
+
+  switch (act.kind) {
+    case 'activated':
+      await writeActivation({ key_hash: keyHash, activation_id: act.activationId });
+      return { kind: 'granted' };
+    case 'limit_reached':
+      return { kind: 'limit' };
+    case 'invalid':
+      return { kind: 'invalid' };
+    case 'unreachable':
+      return { kind: 'unreachable' };
+  }
+}
 
 // The full resolution flow (uncached). Wrapped by getTier(), which memoizes.
 async function resolveTier(): Promise<Tier> {
@@ -219,6 +420,8 @@ async function resolveTier(): Promise<Tier> {
   }
   if (cache && cache.key_hash !== keyHash) {
     logger.debug('License validation: key changed since last validation, re-validating');
+    // A different key invalidates this machine's old activation slot.
+    await clearActivation();
   }
 
   // Without an org id we cannot validate against Polar at all.
@@ -227,17 +430,23 @@ async function resolveTier(): Promise<Tier> {
     return 'free';
   }
 
-  // 2. Ask Polar.
-  const outcome = await validateWithPolar(key);
+  // 2. Ask Polar — validating this machine's slot or claiming a new one.
+  const outcome = await resolveAgainstPolar(key, keyHash);
 
   if (outcome.kind === 'granted') {
-    await writeCache(buildCache('pro', key, outcome.status));
+    await writeCache(buildCache('pro', key, 'granted'));
     logger.info('License tier: pro');
     return 'pro';
   }
 
+  if (outcome.kind === 'limit') {
+    await writeCache(buildCache('free', key, 'activation_limit'));
+    logger.info('License tier: free (activation limit reached — key is on too many machines)');
+    return 'free';
+  }
+
   if (outcome.kind === 'invalid') {
-    await writeCache(buildCache('free', key, outcome.status));
+    await writeCache(buildCache('free', key, 'invalid'));
     logger.info('License tier: free (invalid key)');
     return 'free';
   }
@@ -252,6 +461,30 @@ async function resolveTier(): Promise<Tier> {
   logger.warn('License validation: network error, falling back to free');
   logger.info('License tier: free (validation unavailable)');
   return 'free';
+}
+
+// Releases this machine's activation slot (so the user can re-use it elsewhere),
+// then clears the local activation + cache. Returns a human-readable result. Used
+// by the `veilguard-cli deactivate` command. Never throws.
+export async function deactivateMachine(): Promise<string> {
+  const key = normalizedKey();
+  if (!key) return 'No VEILGUARD_KEY set — nothing to deactivate.';
+  if (!POLAR_ORG_ID) return 'No organization configured — cannot deactivate.';
+
+  const stored = await readActivation();
+  if (!stored || stored.key_hash !== hashKey(key)) {
+    return 'This machine has no active license activation to release.';
+  }
+
+  const ok = await deactivateWithPolar(key, stored.activation_id);
+  await clearActivation();
+  // Drop the cached tier so the next run re-resolves from scratch.
+  await rm(LICENSE_CACHE_PATH, { force: true }).catch(() => {});
+  sessionTier = undefined;
+
+  return ok
+    ? 'Deactivated this machine. Its activation slot is now free for another machine.'
+    : 'Cleared this machine locally, but Polar could not be reached to free the slot — it will expire on its own.';
 }
 
 // Returns the caller's tier. Never throws. Memoized for the process lifetime so

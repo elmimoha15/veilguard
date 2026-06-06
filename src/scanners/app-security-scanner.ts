@@ -5,7 +5,7 @@ import { readFileSafe } from '../utils/file-reader.js';
 import { logger } from '../utils/logger.js';
 import { getPatternsDir } from '../utils/paths.js';
 import { renderFix } from '../license/license.js';
-import { isDocFile, isTestOrExampleFile } from '../utils/match-context.js';
+import { isDocFile, isTestOrExampleFile, vetMatch } from '../utils/match-context.js';
 import type { Finding, ScanResult, Tier } from '../types.js';
 
 interface AuthRule {
@@ -350,7 +350,12 @@ function checkOpenRedirects(filePath: string, content: string): Finding[] {
   return findings;
 }
 
-function applyAuthRules(filePath: string, content: string, rules: AuthRule[]): Finding[] {
+function applyAuthRules(
+  filePath: string,
+  content: string,
+  rules: AuthRule[],
+  rootDir: string,
+): Finding[] {
   const lines = content.split('\n');
   const findings: Finding[] = [];
 
@@ -364,8 +369,13 @@ function applyAuthRules(filePath: string, content: string, rules: AuthRule[]): F
     }
 
     for (let i = 0; i < lines.length; i++) {
-      if (regex.test(lines[i])) {
-        findings.push({
+      regex.lastIndex = 0;
+      const m = regex.exec(lines[i]);
+      if (!m) continue;
+      // Route through the context classifier so a rule that matches inside a
+      // string, comment, doc, or example is suppressed/down-ranked.
+      const vetted = vetMatch(
+        {
           id: `auth-${rule.id}`,
           severity: rule.severity,
           category: rule.category ?? 'auth',
@@ -376,10 +386,13 @@ function applyAuthRules(filePath: string, content: string, rules: AuthRule[]): F
           fix: rule.fix,
           cwe: rule.cwe,
           breach_precedent: rule.breach_precedent,
-        });
+        },
+        { filePath, content, lineIndex: i, column: m.index, matchText: m[0], rootDir, mode: 'code-construct' },
+      );
+      if (vetted) {
+        findings.push(vetted);
         break; // one finding per rule per file
       }
-      regex.lastIndex = 0;
     }
   }
 
@@ -407,7 +420,7 @@ export async function scanAppSecurity(directory: string, _tier: Tier): Promise<S
     findings.push(...checkErrorExposure(file, content));
     findings.push(...checkSensitiveLogging(file, content));
     findings.push(...checkOpenRedirects(file, content));
-    findings.push(...applyAuthRules(file, content, rules));
+    findings.push(...applyAuthRules(file, content, rules, directory));
   }
 
   return {

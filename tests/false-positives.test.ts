@@ -6,6 +6,7 @@ import { scanSecrets } from '../src/scanners/secret-scanner.js';
 import { checkCors } from '../src/scanners/cors-scanner.js';
 import { scanInjection } from '../src/scanners/injection-scanner.js';
 import { scanWebhooks } from '../src/scanners/webhook-scanner.js';
+import { scanAppSecurity } from '../src/scanners/app-security-scanner.js';
 import { checkEnv } from '../src/scanners/env-checker.js';
 import { runAllScanners } from '../src/scanners/full-audit.js';
 import { calculateScore } from '../src/scanners/scoring.js';
@@ -122,6 +123,18 @@ const CLEAN_FILES: Record<string, string> = {
     'Avoid `cors({ origin: \'*\' })` on authenticated APIs.',
     '',
   ].join('\n'),
+
+  // Safe, real config — the new JWT/TLS/cookie/SSRF rules must NOT fire on these.
+  'lib/safe.ts': [
+    "import jwt from 'jsonwebtoken';",
+    "import https from 'https';",
+    'const token = jwt.sign({ id: 1 }, process.env.JWT_SECRET);',
+    'const agent = new https.Agent({ rejectUnauthorized: true });',
+    "const cookie = { httpOnly: true, secure: true, sameSite: 'lax' };",
+    "async function load() { return fetch('https://api.example.com/data'); }",
+    'export { token, agent, cookie, load };',
+    '',
+  ].join('\n'),
 };
 
 // A genuinely insecure API. Every issue is real, executable code and MUST flag.
@@ -163,6 +176,22 @@ const VULN_FILES: Record<string, string> = {
     'function grantAccess(_customer: string): void {}',
     '',
     'export default router;',
+    '',
+  ].join('\n'),
+
+  // SSRF, path traversal, hardcoded JWT secret, and disabled TLS verification.
+  'api/proxy.ts': [
+    "import jwt from 'jsonwebtoken';",
+    "import https from 'https';",
+    "import { readFile } from 'fs/promises';",
+    '',
+    'export async function handler(req: any, res: any) {',
+    '  const upstream = await fetch(req.query.url);',
+    "  const token = jwt.sign({ id: 1 }, 'supersecret123');",
+    '  const agent = new https.Agent({ rejectUnauthorized: false });',
+    '  const data = await readFile(req.query.path);',
+    '  res.json({ upstream, token, agent, data });',
+    '}',
     '',
   ].join('\n'),
 };
@@ -242,6 +271,18 @@ describe('true-positive corpus (vulnerable app) — still flagged', () => {
   it('webhook scanner flags the unverified handler', async () => {
     const c = criticals(await scanWebhooks(vulnDir, 'free'));
     expect(c.some((f) => f.id === 'webhook-unverified-stripe')).toBe(true);
+  });
+
+  it('flags SSRF and path traversal (OWASP A10 / A03)', async () => {
+    const c = criticals(await scanInjection(vulnDir, 'free'));
+    expect(c.some((f) => f.id === 'injection-ssrf-user-url')).toBe(true);
+    expect(c.some((f) => f.id === 'injection-path-traversal-user-input')).toBe(true);
+  });
+
+  it('flags hardcoded JWT secret and disabled TLS verification (OWASP A02)', async () => {
+    const c = criticals(await scanAppSecurity(vulnDir, 'free'));
+    expect(c.some((f) => f.id === 'auth-jwt-hardcoded-secret')).toBe(true);
+    expect(c.some((f) => f.id === 'auth-tls-reject-unauthorized-false')).toBe(true);
   });
 
   it('full audit grades the vulnerable app F', async () => {

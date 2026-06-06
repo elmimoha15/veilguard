@@ -72,10 +72,12 @@ describe('full audit free vs pro', () => {
     expect(out).not.toContain('USING (true)'); // no actual findings leaked
   });
 
-  it('pro report shows the grade and AI-ready fix prompt', () => {
+  it('pro report hands the user a copy-paste fix prompt (does not fix it for them)', () => {
     const out = formatAuditReport(auditReport());
     expect(out).toContain('Grade: F');
-    expect(out).toContain('AI Fix Prompt');
-    expect(out).toContain('replacing USING (true)');
+    expect(out).toContain('How to fix all of this');
+    expect(out).toMatch(/paste it to your AI/i);
+    expect(out).toMatch(/won't touch your code/i);
+    expect(out).toContain('replacing USING (true)'); // the fix prompt body is still included
   });
 });

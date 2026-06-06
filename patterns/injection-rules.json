@@ -98,5 +98,55 @@
     "severity": "critical",
     "fix": "Do not merge req.body straight into a model. Whitelist fields with a schema validator before updating.",
     "cwe": "CWE-915"
+  },
+  {
+    "id": "ssrf-user-url",
+    "name": "Server-Side Request Forgery (SSRF) via user-supplied URL",
+    "pattern": "(fetch|axios|axios\\.get|axios\\.post|got|needle|superagent\\.(get|post)|http\\.get|https\\.get|http\\.request|https\\.request)\\s*\\(\\s*[^)]*req\\.(query|body|params)",
+    "severity": "critical",
+    "fix": "Don't request a URL built from user input. Validate it against an allowlist of hosts, block internal/metadata addresses (169.254.169.254, localhost, 10./172.16./192.168.), and disable redirects.",
+    "cwe": "CWE-918",
+    "breach_precedent": "Capital One 2019: an SSRF to the cloud metadata endpoint exposed 100M+ customer records."
+  },
+  {
+    "id": "path-traversal-user-input",
+    "name": "Path traversal — file path built from user input",
+    "pattern": "(readFile|readFileSync|createReadStream|writeFile|writeFileSync|unlink|sendFile|download)\\s*\\(\\s*[^)]*req\\.(query|body|params)",
+    "severity": "critical",
+    "fix": "Never build a file path from user input. Resolve against a fixed base directory and verify the result stays inside it, or map an ID to a known filename.",
+    "cwe": "CWE-22",
+    "breach_precedent": "Path traversal lets attackers read /etc/passwd, your .env, or source code by sending ../../ sequences."
+  },
+  {
+    "id": "code-injection-function-constructor",
+    "name": "Code injection via Function constructor",
+    "pattern": "new\\s+Function\\s*\\([^)]*req\\.(body|query|params)",
+    "severity": "critical",
+    "fix": "Never build a Function from user input. Use a safe parser or a whitelist of allowed operations.",
+    "cwe": "CWE-94"
+  },
+  {
+    "id": "sql-orm-raw-unsafe",
+    "name": "SQL injection via raw/unsafe ORM query with interpolation",
+    "pattern": "(sequelize\\.query|knex\\.raw|\\$queryRawUnsafe|\\$executeRawUnsafe)\\s*\\(\\s*`[^`]*\\$\\{",
+    "severity": "critical",
+    "fix": "Use bound parameters or the query builder instead of interpolating values into raw SQL.",
+    "cwe": "CWE-89"
+  },
+  {
+    "id": "xss-innerhtml-location",
+    "name": "XSS via innerHTML from location/URL",
+    "pattern": "innerHTML\\s*=\\s*[^;]*(location|document\\.URL|window\\.name)",
+    "severity": "critical",
+    "fix": "Don't assign untrusted URL/location data to innerHTML. Use textContent, or sanitize with DOMPurify.",
+    "cwe": "CWE-79"
+  },
+  {
+    "id": "xss-document-write",
+    "name": "XSS via document.write with dynamic input",
+    "pattern": "document\\.write(ln)?\\s*\\([^)]*(location|searchParams|document\\.URL|req\\.(query|body|params))",
+    "severity": "warning",
+    "fix": "Avoid document.write with any dynamic value. Build DOM nodes and set textContent instead.",
+    "cwe": "CWE-79"
   }
 ]
