@@ -28,7 +28,12 @@ From your project root, run:
 npx -y --package=veilguard veilguard-cli init
 ```
 
-Veilguard asks which IDE(s) you use, then sets each one up. The MCP server config is written to the IDE's **global** location (in your home folder), so it works across all your projects and **nothing is added to your repo**. The optional AI rules file (`.cursorrules`, `.windsurfrules`, `CLAUDE.md`, …) is written to the project and auto-added to `.gitignore`. Pick one or several (e.g. `1,3,4`). Then restart your IDE.
+Veilguard shows an arrow-key checklist of IDEs — use **↑/↓** to move, **space** to select, **a** for all, **enter** to confirm. It writes each selected IDE's MCP config to its **global** location (in your home folder), so it works across all your projects and **nothing is added to your repo**. The optional AI rules file (`.cursorrules`, `.windsurfrules`) is written to the project and auto-added to `.gitignore`. Then restart your IDE.
+
+> **Claude Code** isn't in the checklist — it has its own one-liner:
+> ```bash
+> claude mcp add veilguard -- npx -y --package=veilguard veilguard-mcp
+> ```
 
 ### Option B — Manual setup
 
