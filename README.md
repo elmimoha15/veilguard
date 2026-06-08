@@ -28,7 +28,7 @@ From your project root, run:
 npx -y --package=veilguard veilguard-cli init
 ```
 
-Veilguard shows an arrow-key checklist of IDEs — use **↑/↓** to move, **space** to select, **a** for all, **enter** to confirm. It writes each selected IDE's MCP config to its **global** location (in your home folder), so it works across all your projects and **nothing is added to your repo**. The optional AI rules file (`.cursorrules`, `.windsurfrules`) is written to the project and auto-added to `.gitignore`. Then restart your IDE.
+Veilguard shows an arrow-key list of IDEs — use **↑/↓** to move and **enter** to pick yours. It writes that IDE's MCP config to its **global** location (in your home folder), so it works across all your projects and **nothing is added to your repo**. The optional AI rules file (`.cursorrules`, `.windsurfrules`) is written to the project and auto-added to `.gitignore`. Then restart your IDE.
 
 > **Claude Code** isn't in the checklist — it has its own one-liner:
 > ```bash
@@ -60,7 +60,7 @@ Copy this JSON into your IDE's MCP config file:
 |-----|-------------|------------|
 | **Cursor** | `.cursor/mcp.json` (project) | `mcpServers` |
 | **VS Code** | `.vscode/mcp.json` (project) | `servers` + `"type": "stdio"` — see below |
-| **Windsurf** | `~/.windsurf/mcp.json` (global) | `mcpServers` |
+| **Windsurf** | `~/.codeium/windsurf/mcp_config.json` (global) | `mcpServers` |
 | **Claude Code** | run `claude mcp add veilguard -- npx -y --package=veilguard veilguard-mcp` | — |
 | **Antigravity** | `~/.gemini/antigravity/mcp_config.json` (global) | `mcpServers` |
 

@@ -298,7 +298,10 @@ async function setupVscode(_cwd: string): Promise<IdeResult> {
 }
 
 async function setupWindsurf(cwd: string): Promise<IdeResult> {
-  const configPath = join(homedir(), '.windsurf', 'mcp.json'); // global, all projects
+  // Windsurf (Codeium) reads MCP config from ~/.codeium/windsurf/mcp_config.json
+  // — NOT ~/.windsurf/mcp.json. Writing to the wrong file means Windsurf never
+  // sees the server.
+  const configPath = join(homedir(), '.codeium', 'windsurf', 'mcp_config.json'); // global, all projects
   await mergeServer(configPath, 'mcpServers', STDIO_SERVER);
   await writeFile(join(cwd, '.windsurfrules'), await readTemplate('windsurfrules.txt'));
   return {
@@ -372,31 +375,29 @@ interface KeypressKey {
   ctrl?: boolean;
 }
 
-// Interactive arrow-key multi-select. ↑/↓ to move, space to toggle, a for all,
-// enter to confirm, esc/ctrl-c to cancel. Returns the chosen option indices.
+// Interactive arrow-key single-select. ↑/↓ to move, enter to choose ONE option
+// (which then runs), esc/ctrl-c to cancel. Returns the chosen index, or -1.
 // Falls back to a typed prompt when stdin isn't an interactive terminal.
-function promptMultiSelect(title: string, options: string[]): Promise<number[]> {
+function promptSelect(title: string, options: string[]): Promise<number> {
   if (!input.isTTY || typeof input.setRawMode !== 'function') {
-    return promptMultiSelectFallback(title, options);
+    return promptSelectFallback(title, options);
   }
 
-  return new Promise<number[]>((resolve) => {
+  return new Promise<number>((resolve) => {
     let cursor = 0;
-    const selected = new Set<number>();
-    const hint = '  ↑/↓ move · space select · a all · enter confirm · esc cancel';
+    const hint = '  ↑/↓ move · enter select · esc cancel';
 
     const draw = (first: boolean): void => {
       if (!first) output.write(`\x1b[${options.length + 1}A`); // move up over the list + hint
       for (let i = 0; i < options.length; i++) {
         const pointer = i === cursor ? '❯' : ' ';
-        const box = selected.has(i) ? '◉' : '◯';
         const label = i === cursor ? `\x1b[36m${options[i]}\x1b[0m` : options[i];
-        output.write(`\x1b[2K ${pointer} ${box} ${label}\n`);
+        output.write(`\x1b[2K ${pointer} ${label}\n`);
       }
       output.write(`\x1b[2K\x1b[2m${hint}\x1b[0m\n`);
     };
 
-    const finish = (result: number[]): void => {
+    const finish = (result: number): void => {
       input.setRawMode?.(false);
       input.removeListener('keypress', onKey);
       input.pause();
@@ -405,7 +406,7 @@ function promptMultiSelect(title: string, options: string[]): Promise<number[]> 
 
     const onKey = (_s: string | undefined, key: KeypressKey): void => {
       if (!key) return;
-      if (key.ctrl && key.name === 'c') return finish([]);
+      if (key.ctrl && key.name === 'c') return finish(-1);
       switch (key.name) {
         case 'up':
         case 'k':
@@ -417,21 +418,11 @@ function promptMultiSelect(title: string, options: string[]): Promise<number[]> 
           cursor = (cursor + 1) % options.length;
           draw(false);
           break;
-        case 'space':
-          if (selected.has(cursor)) selected.delete(cursor);
-          else selected.add(cursor);
-          draw(false);
-          break;
-        case 'a':
-          if (selected.size === options.length) selected.clear();
-          else for (let i = 0; i < options.length; i++) selected.add(i);
-          draw(false);
-          break;
         case 'return':
-          finish([...selected].sort((a, b) => a - b));
+          finish(cursor);
           break;
         case 'escape':
-          finish([]);
+          finish(-1);
           break;
       }
     };
@@ -445,22 +436,15 @@ function promptMultiSelect(title: string, options: string[]): Promise<number[]> 
   });
 }
 
-// Non-interactive fallback (piped stdin / no TTY): a typed, comma-separated prompt.
-async function promptMultiSelectFallback(title: string, options: string[]): Promise<number[]> {
+// Non-interactive fallback (piped stdin / no TTY): a typed numeric prompt.
+async function promptSelectFallback(title: string, options: string[]): Promise<number> {
   const rl = createInterface({ input, output });
   output.write(`${title}\n`);
   options.forEach((o, i) => output.write(`  ${i + 1}. ${o}\n`));
-  output.write(`  ${options.length + 1}. All of the above\n`);
-  const answer = await rl.question('Enter number(s), comma-separated > ');
+  const answer = await rl.question('Enter a number > ');
   rl.close();
-
-  const out = new Set<number>();
-  for (const tok of answer.split(',').map((t) => t.trim()).filter(Boolean)) {
-    const n = Number(tok);
-    if (n === options.length + 1) for (let i = 0; i < options.length; i++) out.add(i);
-    else if (Number.isInteger(n) && n >= 1 && n <= options.length) out.add(n - 1);
-  }
-  return [...out].sort((a, b) => a - b);
+  const n = Number(answer.trim());
+  return Number.isInteger(n) && n >= 1 && n <= options.length ? n - 1 : -1;
 }
 
 async function runInit(): Promise<void> {
@@ -468,24 +452,22 @@ async function runInit(): Promise<void> {
 
   process.stdout.write('🛡️  Veilguard — Silent security for vibe coders\n\n');
 
-  const picked = await promptMultiSelect('Which IDE(s) do you use?', IDES.map((i) => i.name));
+  const choice = await promptSelect('Which IDE do you use?', IDES.map((i) => i.name));
 
-  if (picked.length === 0) {
+  if (choice < 0) {
     process.stdout.write('\nNothing selected. Run `veilguard init` again to set up.\n');
     return;
   }
 
   process.stdout.write('\n');
   const toIgnore = new Set<string>(['.veilguard/']);
-  for (const idx of picked) {
-    const ide = IDES[idx];
-    try {
-      const result = await ide.setup(cwd);
-      process.stdout.write(`  ✓ ${result.message}\n`);
-      for (const path of result.gitignore) toIgnore.add(path);
-    } catch (e) {
-      process.stdout.write(`  ✗ ${ide.name}: ${(e as Error).message}\n`);
-    }
+  const ide = IDES[choice];
+  try {
+    const result = await ide.setup(cwd);
+    process.stdout.write(`  ✓ ${result.message}\n`);
+    for (const path of result.gitignore) toIgnore.add(path);
+  } catch (e) {
+    process.stdout.write(`  ✗ ${ide.name}: ${(e as Error).message}\n`);
   }
 
   const added = await ensureGitignored(cwd, [...toIgnore]);
