@@ -1,6 +1,6 @@
 {
   "name": "veilguard",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "MCP security scanner for AI-assisted development. Catches vulnerabilities in AI-generated code.",
   "type": "module",
   "bin": {
