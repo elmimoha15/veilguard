@@ -1,8 +1,12 @@
 <div align="center">
 
-# 🛡️ Veilguard
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.png">
+  <img src="assets/logo-light.png" alt="Veilguard" width="380">
+</picture>
 
-**Silent security for AI-assisted development**
+### Silent security for AI-assisted development
 
 [![npm version](https://img.shields.io/npm/v/veilguard.svg)](https://www.npmjs.com/package/veilguard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -138,10 +142,6 @@ Your AI agent calls Veilguard tools **automatically** while you code:
 | Git history scanning | — | ✅ |
 
 **Pro:** $19/month · unlimited audits/month · [Get Pro →](https://veilguard.dev/pro)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 

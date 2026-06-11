@@ -13,6 +13,8 @@ tests/
 **/*.spec.js
 
 # Local / dev artifacts (belt and suspenders with "files" whitelist)
+assets/
+LOGOS/
 src/
 coverage/
 node_modules/
