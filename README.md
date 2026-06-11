@@ -1,9 +1,9 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.png">
-  <img src="assets/logo-light.png" alt="Veilguard" width="380">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/elmimoha15/veilguard/main/assets/logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/elmimoha15/veilguard/main/assets/logo-light.png">
+  <img src="https://raw.githubusercontent.com/elmimoha15/veilguard/main/assets/logo-light.png" alt="Veilguard" width="380">
 </picture>
 
 ### Silent security for AI-assisted development
