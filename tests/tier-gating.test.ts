@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { renderFix, getFullAuditMessage } from '../src/license/license.js';
+import { renderFix, getFullAuditMessage, makeUpsellAppender } from '../src/license/license.js';
+import { UPSELL_NUDGE_THRESHOLD } from '../src/utils/constants.js';
 import { formatRlsResults } from '../src/scanners/rls-analyzer.js';
 import { formatAuditReport } from '../src/scanners/full-audit.js';
 import type { Finding, ScanResult, AuditReport } from '../src/types.js';
@@ -60,6 +61,42 @@ describe('scanner formatter respects tier', () => {
     const out = formatRlsResults(rlsResult(), 'pro');
     expect(out).toContain('auth.uid() = user_id');
     expect(out).toContain('Lovable');
+  });
+});
+
+describe('scanner upsell footer + bypass nudge', () => {
+  it('appends the Pro footer to a free result — even a clean scan with no findings', () => {
+    const append = makeUpsellAppender('free');
+    const out = append('✅ No secrets found');
+    expect(out).toContain('✅ No secrets found'); // original output preserved
+    expect(out).toContain('veilguard.dev/pro'); // offer surfaced on a clean scan
+    expect(out).toContain('full_audit');
+  });
+
+  it('never appends the footer for pro', () => {
+    const append = makeUpsellAppender('pro');
+    const out = append('✅ No secrets found');
+    expect(out).toBe('✅ No secrets found');
+    expect(out).not.toContain('veilguard.dev/pro');
+  });
+
+  it('shows the bypass nudge once the free session hits the scanner threshold', () => {
+    const append = makeUpsellAppender('free');
+    // Below the threshold: footer only, no nudge.
+    for (let i = 1; i < UPSELL_NUDGE_THRESHOLD; i++) {
+      expect(append('clean')).not.toContain('Running scanners one at a time');
+    }
+    // The threshold-th call surfaces the nudge.
+    expect(append('clean')).toContain('Running scanners one at a time');
+    // And it does not repeat on subsequent calls.
+    expect(append('clean')).not.toContain('Running scanners one at a time');
+  });
+
+  it('never shows the bypass nudge for pro, however many calls', () => {
+    const append = makeUpsellAppender('pro');
+    for (let i = 0; i <= UPSELL_NUDGE_THRESHOLD; i++) {
+      expect(append('clean')).not.toContain('Running scanners one at a time');
+    }
   });
 });
 

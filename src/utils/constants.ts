@@ -75,3 +75,6 @@ export const MACHINE_ID_PATH = join(VEILGUARD_HOME, MACHINE_ID_FILE);
 // ── Tier limits ───────────────────────────────────────────────────────────────
 export const PRO_MONTHLY_AUDIT_LIMIT = 3;
 export const FREE_TIER_MAX_FINDINGS = 3;
+// After a free session runs this many individual scanners, we surface a stronger
+// nudge toward the graded full_audit (shown once, not on every subsequent call).
+export const UPSELL_NUDGE_THRESHOLD = 3;

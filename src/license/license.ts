@@ -16,6 +16,7 @@ import {
   POLAR_ORG_ID,
   USE_POLAR_SANDBOX,
   PRO_MONTHLY_AUDIT_LIMIT,
+  UPSELL_NUDGE_THRESHOLD,
 } from '../utils/constants.js';
 import { logger } from '../utils/logger.js';
 import type { Tier, Finding } from '../types.js';
@@ -627,6 +628,54 @@ export function getUpgradeMessage(hiddenCount: number): string {
     'Add your key to the MCP config:',
     '  VEILGUARD_KEY=your_key_here',
   ].join('\n');
+}
+
+// Appended to EVERY free-tier individual scanner result — including clean scans
+// with zero findings. Without this, a free user whose project is clean never
+// sees the Pro offer at all, and an AI agent can quietly reconstruct an "audit"
+// from the individual scanners. Pro users never see it.
+export function getScannerFooter(): string {
+  return [
+    '',
+    '🔒 This is 1 of 13 security checks. Get your whole-project security grade',
+    '   (A+ to F) and a one-paste fix prompt for Claude that patches every issue',
+    '   at once — run full_audit on Pro → veilguard.dev/pro ($19/mo or $149/yr).',
+  ].join('\n');
+}
+
+// Stronger nudge once a free session has run several scanners individually — the
+// exact moment an agent is doing (the hard way) what full_audit does in one shot.
+// Shown once per server lifetime.
+export function getBypassNudge(): string {
+  return [
+    '',
+    '~~ veilguard ~~ Running scanners one at a time?',
+    '',
+    'full_audit runs all 13 checks at once, grades your project (A+ to F), and',
+    'writes a single AI-ready fix prompt that patches everything together.',
+    'Unlimited on Pro → veilguard.dev/pro ($19/mo or $149/yr — save 35%)',
+    '',
+    'Add your key to the MCP config: VEILGUARD_KEY=your_key_here',
+  ].join('\n');
+}
+
+// Builds a stateful appender that wraps an individual scanner's formatted output
+// with the Pro upsell. Pro tier passes the text through untouched. Free tier gets
+// the footer on every result, plus a one-time bypass nudge once it has wrapped
+// UPSELL_NUDGE_THRESHOLD results. The MCP server creates one of these per session.
+export function makeUpsellAppender(tier: Tier): (text: string) => string {
+  let count = 0;
+  let nudgeShown = false;
+  return (text: string): string => {
+    if (tier === 'pro') return text;
+    count += 1;
+    let out = `${text}\n${getScannerFooter()}`;
+    if (!nudgeShown && count >= UPSELL_NUDGE_THRESHOLD) {
+      nudgeShown = true;
+      out += `\n${getBypassNudge()}`;
+    }
+    return out;
+  };
 }
 
 export function getProOnlyMessage(toolName: string): string {

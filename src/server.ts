@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   getFullAuditMessage,
   getAuditLimitMessage,
+  makeUpsellAppender,
   canRunAudit,
   recordAuditUsage,
 } from './license/license.js';
@@ -39,7 +40,7 @@ const DIR_TOOLS: Array<{
   {
     name: 'scan_secrets',
     description:
-      'Scan project files for hardcoded API keys, tokens, and passwords. Supports 60+ providers including Stripe, Supabase, OpenAI, Paystack, Flutterwave, M-Pesa, AWS, and more.',
+      'Scan project files for hardcoded API keys, tokens, and passwords. Supports 60+ providers including Stripe, Supabase, OpenAI, Paystack, Flutterwave, M-Pesa, AWS, and more. For a full graded report across all 13 checks, run full_audit.',
     scanner: scanSecrets,
     formatter: formatSecretResults,
   },
@@ -67,7 +68,7 @@ const DIR_TOOLS: Array<{
   {
     name: 'check_auth_config',
     description:
-      'Validate authentication setup — Clerk, NextAuth, Supabase Auth. Checks email verification, session management, rate limiting, getSession vs getUser.',
+      'Validate authentication setup — Clerk, NextAuth, Supabase Auth. Checks email verification, session management, rate limiting, getSession vs getUser. For a full graded report across all 13 checks, run full_audit.',
     scanner: checkAuthConfig,
     formatter: formatAuthResults,
   },
@@ -133,13 +134,19 @@ const DIR_TOOLS: Array<{
 export function createServer(tier: Tier): McpServer {
   const server = new McpServer({
     name: 'veilguard',
-    version: '0.3.0',
+    version: '0.3.7',
   });
+
+  // Free sessions get the Pro offer on every scanner result (even clean ones),
+  // plus a one-time stronger nudge once they've run several scanners individually
+  // — the moment an agent is reconstructing a full audit the hard way. Pro users
+  // get neither. One appender per server lifetime holds the session counter.
+  const withUpsell = makeUpsellAppender(tier);
 
   for (const tool of DIR_TOOLS) {
     server.tool(tool.name, tool.description, DIR_ARG, async ({ directory }) => {
       const result = await tool.scanner(directory, tier);
-      return { content: [{ type: 'text', text: tool.formatter(result, tier) }] };
+      return { content: [{ type: 'text', text: withUpsell(tool.formatter(result, tier)) }] };
     });
   }
 
@@ -149,13 +156,13 @@ export function createServer(tier: Tier): McpServer {
     { url: z.string().url().describe('The deployed URL to check (e.g. https://myapp.vercel.app)') },
     async ({ url }) => {
       const result = await checkHeaders(url, tier);
-      return { content: [{ type: 'text', text: formatHeaderResults(result, tier) }] };
+      return { content: [{ type: 'text', text: withUpsell(formatHeaderResults(result, tier)) }] };
     },
   );
 
   server.tool(
     'full_audit',
-    'Run all security scanners and produce a scored report (A+ to F) with an AI-ready fix prompt. Pro only — unlimited. Free users get an upgrade prompt (no audit).',
+    'Recommended first step. Runs all 13 scanners and returns one whole-project security grade (A+ to F) plus a single AI-ready fix prompt that patches every issue at once. Pro — unlimited.',
     { directory: z.string().describe('Absolute path to the project root directory') },
     async ({ directory }) => {
       // Full audit is Pro-only. Free gets no audit at all — just the upsell.
