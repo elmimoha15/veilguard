@@ -19,7 +19,7 @@ import {
   UPSELL_NUDGE_THRESHOLD,
 } from '../utils/constants.js';
 import { logger } from '../utils/logger.js';
-import type { Tier, Finding } from '../types.js';
+import type { Tier, Finding, ScanResult } from '../types.js';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Veilguard license system (Polar.sh)
@@ -560,22 +560,58 @@ export async function recordAuditUsage(): Promise<void> {
 // MCP tool handlers.
 // ──────────────────────────────────────────────────────────────────────────────
 
+// The free-tier gate for an INDIVIDUAL scanner that found issues. Free users see
+// how many problems exist and how severe — never *where* they are or how to fix
+// them. This is deliberate: in an AI IDE the host assistant is itself a coding
+// agent, so revealing the file, line, or a plain-English description is enough for
+// it to patch the issue for free. Locking the location (not just the fix text) is
+// what makes Pro worth paying for. `passed` findings are not issues and are
+// excluded by the caller before this runs.
+export function formatFreeLocked(result: ScanResult): string {
+  const issues = result.findings.filter((f) => f.severity !== 'passed');
+  const crit = issues.filter((f) => f.severity === 'critical').length;
+  const warn = issues.filter((f) => f.severity === 'warning').length;
+  const info = issues.filter((f) => f.severity === 'info').length;
+
+  const breakdown: string[] = [];
+  if (crit) breakdown.push(`🔴 ${crit} critical`);
+  if (warn) breakdown.push(`🟠 ${warn} warning${warn > 1 ? 's' : ''}`);
+  if (info) breakdown.push(`🟡 ${info} info`);
+
+  const n = issues.length;
+  return [
+    `~~ veilguard ~~ ${n} issue${n > 1 ? 's' : ''} found 🔒`,
+    '',
+    `  ${breakdown.join('    ')}`,
+    '',
+    '  The exact files, lines, and fixes are a Pro feature — and your AI',
+    "  assistant can't patch what it can't see. Pro unlocks every finding",
+    '  plus a one-paste fix prompt that patches them all at once.',
+    '',
+    '  →  Get your key at veilguard.dev/pro   ($19/mo or $149/yr — save 35%)',
+    '',
+    '  Then add it to your MCP config and restart your IDE:',
+    '     VEILGUARD_KEY=your_key_here',
+  ].join('\n');
+}
+
 // The full security audit (grade + AI fix prompt) is a Pro-only tool. Free
 // users get this upsell instead — they do not get any full audit at all.
 export function getFullAuditMessage(): string {
   return [
     '~~ veilguard ~~ Full audit is a Pro feature 🔒',
     '',
-    'The full security audit grades your whole project (A+ to F) and writes an',
-    'AI-ready fix prompt that patches every issue at once. It\'s unlimited on Pro.',
+    'The full security audit grades your whole project (A+ to F) and writes a',
+    'single AI-ready fix prompt that patches every issue at once — unlimited on Pro.',
     '',
-    'Want your grade and the one-paste fix? Upgrade to Pro:',
-    '→ veilguard.dev/pro ($19/mo or $149/yr — save 35%)',
+    'The individual scanners will tell you *how many* issues you have and how',
+    'severe, but the exact locations, the fixes, and the graded report are Pro —',
+    "so your AI assistant can't quietly patch everything for free.",
     '',
-    'Meanwhile, the individual scanners still run free and will alert you to any',
-    'vulnerability they find (the fixes for those are unlocked with Pro too).',
+    '→  Get your key at veilguard.dev/pro   ($19/mo or $149/yr — save 35%)',
     '',
-    'Add your key to the MCP config: VEILGUARD_KEY=your_key_here',
+    'Then add it to your MCP config and restart your IDE:',
+    '   VEILGUARD_KEY=your_key_here',
   ].join('\n');
 }
 

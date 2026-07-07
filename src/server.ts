@@ -4,6 +4,7 @@ import {
   getFullAuditMessage,
   getAuditLimitMessage,
   makeUpsellAppender,
+  formatFreeLocked,
   canRunAudit,
   recordAuditUsage,
 } from './license/license.js';
@@ -143,10 +144,19 @@ export function createServer(tier: Tier): McpServer {
   // get neither. One appender per server lifetime holds the session counter.
   const withUpsell = makeUpsellAppender(tier);
 
+  // Free tier, issues found → a locked summary (counts + severity only, no
+  // locations/fixes) so the host AI can't self-fix from our output. Free tier,
+  // clean scan → the normal all-clear, plus the upsell footer. Pro → full detail.
+  const render = (result: ScanResult, formatter: (r: ScanResult, t: Tier) => string): string => {
+    const hasIssues = result.findings.some((f) => f.severity !== 'passed');
+    if (tier !== 'pro' && hasIssues) return formatFreeLocked(result);
+    return withUpsell(formatter(result, tier));
+  };
+
   for (const tool of DIR_TOOLS) {
     server.tool(tool.name, tool.description, DIR_ARG, async ({ directory }) => {
       const result = await tool.scanner(directory, tier);
-      return { content: [{ type: 'text', text: withUpsell(tool.formatter(result, tier)) }] };
+      return { content: [{ type: 'text', text: render(result, tool.formatter) }] };
     });
   }
 
@@ -156,7 +166,7 @@ export function createServer(tier: Tier): McpServer {
     { url: z.string().url().describe('The deployed URL to check (e.g. https://myapp.vercel.app)') },
     async ({ url }) => {
       const result = await checkHeaders(url, tier);
-      return { content: [{ type: 'text', text: withUpsell(formatHeaderResults(result, tier)) }] };
+      return { content: [{ type: 'text', text: render(result, formatHeaderResults) }] };
     },
   );
 
